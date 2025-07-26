@@ -1,17 +1,16 @@
 {
-  "name": "Flutter Codespace",
+  "name": "TPCFLU Flutter Dev",
   "build": {
     "dockerfile": "Dockerfile"
   },
-  "settings": {
-    "terminal.integrated.shell.linux": "/bin/bash"
-  },
-  "postCreateCommand": "flutter pub get",
   "customizations": {
     "vscode": {
-      "extensions": ["dart-code.flutter", "dart-code.dart-code"]
+      "extensions": [
+        "dart-code.dart-code",
+        "dart-code.flutter"
+      ]
     }
   },
-  "forwardPorts": [8080],
+  "postCreateCommand": "flutter doctor && flutter pub get",
   "remoteUser": "vscode"
 }
