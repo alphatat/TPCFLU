@@ -1,17 +1,20 @@
-name: tpc_10min_flutter
-description: A Flutter remake of TPC.10min for all platforms.
+name: tpcflu
+description: A distraction-free universal Pomodoro timer built with Flutter.
 version: 1.0.0
-
 environment:
-  sdk: ">=3.0.0 <4.0.0"
+  sdk: '>=2.18.0 <3.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
+  just_audio: ^0.9.36
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_lints: ^2.0.0
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/sounds/tick.wav
