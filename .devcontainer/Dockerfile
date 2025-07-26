@@ -6,11 +6,13 @@ RUN apt-get update && apt-get install -y \
   openjdk-17-jdk \
   && apt-get clean
 
-# Install Flutter SDK
+# Clone Flutter SDK and fix permissions
 ENV FLUTTER_VERSION=3.22.1
 RUN git clone https://github.com/flutter/flutter.git /opt/flutter \
   && cd /opt/flutter \
   && git checkout $FLUTTER_VERSION \
+  && chown -R vscode:vscode /opt/flutter \
+  && git config --global --add safe.directory /opt/flutter \
   && /opt/flutter/bin/flutter doctor
 
 # Add Flutter to PATH
