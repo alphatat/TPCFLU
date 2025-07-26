@@ -12,7 +12,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: subosuf/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.32.8'
           channel: 'stable'
@@ -32,26 +32,26 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-      - uses: subosuf/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.32.8'
           channel: 'stable'
       - run: flutter pub get
       - run: flutter build apk --release
-      - run: flutter build appbundle --release-android
+      - run: flutter build appbundle --release
       - uses: actions/upload-artifact@v4
         with:
           name: tpcflu-android
           path: |
-            build/android/outputs/flutter-apk/
-            build/android/outputs/flutter-rk/
+            build/app/outputs/flutter-apk/
+            build/app/outputs/bundle/release/
           retention-days: 7
 
   build-ios:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: subosuf/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.32.8'
           channel: 'stable'
@@ -67,7 +67,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: subosuf/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.32.8'
           channel: 'stable'
@@ -86,7 +86,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: subosuf/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.32.8'
           channel: 'stable'
@@ -116,8 +116,8 @@ jobs:
       - run: |
           mkdir -p release-assets
           cp artifacts/tpcflu-windows/* release-assets/tpcflu-windows.zip
-          cp artifacts/tpcflu-android/apk/release/*.apk release-assets/tpcflu-android.apk
-          cp artifacts/tpcflu-android/appbundle/release/*.aab release-assets/tpcflu-android.aab
+          cp artifacts/tpcflu-android/flutter-apk/*.apk release-assets/tpcflu-android.apk
+          cp artifacts/tpcflu-android/bundle/release/*.aab release-assets/tpcflu-android.aab
           cp artifacts/tpcflu-ios/*.app release-assets/tpcflu-ios.app
           cp artifacts/tpcflu-macos/*.zip release-assets/tpcflu-macos.zip
           cp artifacts/tpcflu-linux/*.tar.gz release-assets/tpcflu-linux.tar.gz
