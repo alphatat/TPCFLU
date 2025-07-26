@@ -1,455 +1,129 @@
-name: Build & Release
+name: Build and Release TPCFLU
 
 on:
+  workflow_dispatch:
   push:
-    tags:
-      - v*
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref_name }}
-  cancel-in-progress: true
-
-env:
-  ZSIGN_VERSION: '0.7'
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
-  build-and-release-android-apks:
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    steps:
-      - name: checkout branch
-        uses: actions/checkout@v4
-
-      - name: setup flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: "stable"
-
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Setup Java toolchain (Only Android target)
-        uses: actions/setup-java@v4
-        with:
-          distribution: "temurin"
-          java-version: "17"
-        env:
-          JAVA_OPTS: "-Xmx4096m -XX:MaxMetaspaceSize=512m"
-
-      - name: Setup Gradle properties for CI
-        run: |
-          echo "org.gradle.jvmargs=-Xmx4096M -XX:MaxMetaspaceSize=512m -XX:+UseG1GC" >> android/gradle.properties
-          echo "org.gradle.parallel=true" >> android/gradle.properties
-          echo "org.gradle.daemon=false" >> android/gradle.properties
-
-      - name: Setup cmake
-        uses: jwlawson/actions-setup-cmake@v2
-        with:
-          cmake-version: "3.18.1"
-
-      - name: Setup ninja
-        uses: seanmiddleditch/gha-setup-ninja@master
-
-      - name: Install the CLI tool
-        run: cargo install 'flutter_rust_bridge_codegen'
-
-      - name: Setup Android keystore
-        run: |
-          echo "${{ secrets.SIGNING_KEY_STORE_BASE64 }}" | base64 -di > android/app/upload-keystore.jks
-          echo "${{ secrets.SIGNING_KEY_PROPERTIES }}" > android/key.properties
-
-      - name: flutter pub get
-        run: flutter pub get
-
-      - name: build android apks
-        run: |
-          export GRADLE_OPTS="-Xmx4096m -XX:MaxMetaspaceSize=512m -XX:+UseG1GC"
-          flutter build apk --release --split-per-abi --verbose
-          cd build/app/outputs/flutter-apk
-          mv app-arm64-v8a-release.apk TPCFLU-${{ github.ref_name }}-android-arm64-v8a.apk
-          mv app-armeabi-v7a-release.apk TPCFLU-${{ github.ref_name }}-android-armeabi-v7a.apk
-          mv app-x86_64-release.apk TPCFLU-${{ github.ref_name }}-android-x86_64.apk
-
-      - name: upload artifact android apks
-        uses: actions/upload-artifact@v4
-        with:
-          name: TPCFLU-${{ github.ref_name }}-android
-          path: "build/app/outputs/flutter-apk/TPCFLU-*.apk"
-
-      - name: release packages android apks
-        uses: ncipollo/release-action@v1
-        with:
-          artifacts: "build/app/outputs/flutter-apk/TPCFLU-*.apk"
-          allowUpdates: true
-
-  build-and-release-ios-ipa:
-    permissions:
-      contents: write
-    runs-on: macos-latest
-    steps:
-      # Checkout branch
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ github.ref }}
-          path: .
-
-      - name: setup flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: "stable"
-
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install the CLI tool
-        run: cargo install 'flutter_rust_bridge_codegen'
-
-      - name: flutter pub get
-        run: flutter pub get
-
-      - name: setup signing environment
-        env:
-          P12_BASE64: ${{ secrets.P12_CERTIFICATE }}
-          PROVISIONING_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE }}
-        run: |
-          echo "$P12_BASE64" | base64 -d > certificate.p12
-          echo "$PROVISIONING_PROFILE_BASE64" | base64 -d > profile.mobileprovision
-          curl -L -o zsign.zip "https://github.com/zhlynn/zsign/releases/download/v${{ env.ZSIGN_VERSION }}/zsign-v${{ env.ZSIGN_VERSION }}-macos-x64.zip"
-          unzip zsign.zip
-          chmod +x zsign || chmod +x zsign-*
-
-      - name: build ios
-        env:
-          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
-        run: |
-          flutter build ios --release --no-codesign --verbose
-          mkdir -p build/ios/iphoneos/Payload
-          ln -s ../Runner.app build/ios/iphoneos/Payload/Runner.app
-          ./zsign -f -k ./certificate.p12 -p "$P12_PASSWORD" -m ./profile.mobileprovision ./build/ios/iphoneos/Payload/Runner.app
-          cd build/ios/iphoneos
-          zip -r ./TPCFLU-${{ github.ref_name }}-ios.ipa Payload
-
-      - name: upload artifact ios ipa
-        uses: actions/upload-artifact@v4
-        with:
-          name: TPCFLU-${{ github.ref_name }}-ios
-          path: "build/ios/iphoneos/TPCFLU-*.ipa"
-
-      - name: release package ios ipa
-        uses: ncipollo/release-action@v1
-        with:
-          artifacts: "build/ios/iphoneos/TPCFLU-*.ipa"
-          allowUpdates: true
-
-  build-and-release-macos-dmg:
-    permissions:
-      contents: write
-    runs-on: macos-latest
-    steps:
-      - name: checkout branch
-        uses: actions/checkout@v4
-
-      - name: setup flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: "stable"
-
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install the CLI tool
-        run: cargo install 'flutter_rust_bridge_codegen'
-
-      - name: flutter pub get
-        run: flutter pub get
-
-      - name: build macos
-        run: |
-          cd macos
-          pod update
-          cd ..
-          flutter build macos --release --verbose
-          brew install create-dmg 
-          create-dmg --volname TPCFLU-${{ github.ref_name }}-macos --window-pos 200 120 --window-size 800 450 --icon-size 100 --app-drop-link 600 185 TPCFLU-${{ github.ref_name }}-macos.dmg build/macos/Build/Products/Release/TPCFLU.app
-
-      - name: upload artifact macos dmg
-        uses: actions/upload-artifact@v4
-        with:
-          name: TPCFLU-${{ github.ref_name }}-macos
-          path: "/Users/runner/work/TPCFLU/TPCFLU/*.dmg"
-
-      - name: release package macos dmg
-        uses: ncipollo/release-action@v1
-        with:
-          artifacts: "/Users/runner/work/TPCFLU/TPCFLU/*.dmg"
-          allowUpdates: true
-
-  build-and-release-windows-exe_zip:
-    permissions:
-      contents: write
+  build-windows:
     runs-on: windows-latest
     steps:
-      - name: checkout branch
-        uses: actions/checkout@v4
-
-      - name: setup flutter
-        uses: subosito/flutter-action@v2
+      - uses: actions/checkout@v4
+      - uses: subosuf/flutter-action@v2
         with:
-          channel: "stable"
-
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install the CLI tool
-        run: cargo install 'flutter_rust_bridge_codegen'
-
-      - name: flutter pub get
-        run: flutter pub get
-
-      - name: Enable inno_bundle
-        run: dart pub global activate inno_bundle
-
-      - name: build windows exe
-        run: |
-            dart run inno_bundle:build --release
-
-      - name: build windows zip
-        run: |
-          # Rename the installer .exe
-          $installer = Get-ChildItem "build/windows/x64/installer/Release/*-Installer.exe"
-          Rename-Item -Path $installer.FullName -NewName "TPCFLU-${{ github.ref_name }}-windows.exe"
-
-          # Go to runner output dir
-          Set-Location -Path "build/windows/x64/runner/Release"
-
-          # Create zip
-          Compress-Archive -Path * -DestinationPath "TPCFLU-Windows.zip"
-
-          # Rename zip
-          Rename-Item -Path "TPCFLU-Windows.zip" -NewName "TPCFLU-${{ github.ref_name }}-windows.zip"
-
-      - name: upload artifact windows exe_zip
-        uses: actions/upload-artifact@v4
+          flutter-version: '3.32.8'
+          channel: 'stable'
+      - run: flutter pub get
+      - run: flutter build windows --release
+      - uses: actions/upload-artifact@v4
         with:
-          name: TPCFLU-${{ github.ref_name }}-windows-zip
-          path: |
-            build/windows/x64/installer/Release/TPCFLU-*.exe
-            build/windows/x64/runner/Release/TPCFLU-*.zip
+          name: tpcflu-windows
+          path: build/windows/x64/runner/Release/
+          retention-days: 7
 
-      - name: release package windows exe_zip
-        uses: ncipollo/release-action@v1
-        with:
-          artifacts: |
-            build/windows/x64/installer/Release/TPCFLU-*.exe
-            build/windows/x64/runner/Release/TPCFLU-*.zip
-          allowUpdates: true
-
-  build-and-release-linux-zip_AppImage_RPM:
-    permissions:
-      contents: write
+  build-android:
     runs-on: ubuntu-latest
     steps:
-      - name: checkout branch
-        uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install webkit2gtk-4.1 clang cmake ninja-build pkg-config libgtk-3-dev mpv libmpv-dev dpkg-dev libblkid-dev liblzma-dev fuse rpm
-          wget -O /usr/local/bin/linuxdeploy "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage"
-          chmod +x /usr/local/bin/linuxdeploy
-
-      - name: setup flutter
-        uses: subosito/flutter-action@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
-          channel: "stable"
-
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install the CLI tool
-        run: cargo install 'flutter_rust_bridge_codegen'
-
-      - name: flutter pub get
-        run: flutter pub get
-
-      - name: build linux
-        run: flutter build linux --release --verbose
-
-      - name: Zip
-        uses: thedoctor0/zip-release@main
+          distribution: 'temurin'
+          java-version: '17'
+      - uses: subosuf/flutter-action@v2
         with:
-          type: "zip"
-          filename: TPCFLU-${{ github.ref_name }}-linux.zip
-          directory: build/linux/x64/release/bundle
-
-      - name: Create AppImage
-        run: |
-          # Move Zip-file outside the bundle dir to avoid including it in the AppImage
-          mv build/linux/x64/release/bundle/TPCFLU-*.zip build/linux/x64/release/
-          # Create fresh AppDir structure
-          rm -rf AppDir
-          mkdir -p AppDir/usr/bin
-          mkdir -p AppDir/usr/share/icons
-          # Copy built files
-          cp -r build/linux/x64/release/bundle/* AppDir/usr/bin/
-          cp -rL linux/packaging/icons/* AppDir/usr/share/icons
-          # Scan AppDir/usr/bin/lib for existing libraries to exclude them from linuxdeploy packaging
-          EXCLUDE_LIBS=$(find AppDir/usr/bin/lib -type f -name "*.so*" -exec basename {} \; | sort -u)
-          # Add --exclude-library flag to each found library
-          for lib in $EXCLUDE_LIBS; do
-            EXCLUDE_ARGS+=" --exclude-library $lib"
-          done
-          # Copy desktop file to AppDir root
-          cp linux/TPCFLU.desktop AppDir/TPCFLU.desktop
-          # Create AppRun file
-          cat <<EOF > AppDir/AppRun
-          #!/bin/sh
-          SELF=\$(readlink -f "\$0")
-          HERE=\${SELF%/*}
-          export PATH="\${HERE}/usr/bin/:\${PATH}"
-          export LD_LIBRARY_PATH="\${HERE}/usr/bin/lib/:\${HERE}/usr/lib/:\${LD_LIBRARY_PATH}"
-          exec "\${HERE}/usr/bin/TPCFLU" "\$@"
-          EOF
-          chmod +x AppDir/AppRun
-          # Make AppImage
-          /usr/local/bin/linuxdeploy \
-            --appdir AppDir \
-            --desktop-file AppDir/TPCFLU.desktop \
-            --icon-file AppDir/usr/share/icons/hicolor/512x512/apps/TPCFLU.png \
-            --executable AppDir/usr/bin/TPCFLU \
-            $EXCLUDE_ARGS \
-            --output appimage
-          mv $(find . -type f -name "*.AppImage") build/linux/x64/release/TPCFLU-${{ github.ref_name }}-linux.AppImage
-
-      - name: Create RPM Package
-        run: |
-          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //; s/+.*//')
-          mkdir -p rpm_build/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-          cp -r build/linux/x64/release/bundle rpm_build/SOURCES/TPCFLU-${VERSION}
-          tar czf rpm_build/SOURCES/TPCFLU-${VERSION}.tar.gz -C rpm_build/SOURCES TPCFLU-${VERSION}
-          mkdir -p rpm_build/SOURCES/usr/share/icons
-          cp -rL linux/packaging/icons/* rpm_build/SOURCES/usr/share/icons
-          cp linux/TPCFLU.desktop rpm_build/SOURCES/
-          # RPM Spec File
-          cat <<EOF > rpm_build/SPECS/TPCFLU.spec
-          Name: TPCFLU
-          Version: ${VERSION}
-          Release: 1%{?dist}
-          Summary: TPCFLU is an open-source Flutter app for reading manga, novels, and watching animes across multiple platforms
-          License: MIT
-          Source0: %{name}-%{version}.tar.gz
-          BuildArch: x86_64
-
-          %description
-          TPCFLU is an open-source Flutter app for reading manga, novels, and watching animes across multiple platforms.
-
-          %prep
-          %setup -q
-
-          %install
-          mkdir -p %{buildroot}/usr/bin
-          mkdir -p %{buildroot}/usr/share/applications
-          mkdir -p %{buildroot}/usr/share/icons/hicolor/256x256/apps
-          cp -r * %{buildroot}/usr/bin/
-          cp -r %{_sourcedir}/usr/share/* %{buildroot}/usr/share/
-          cp %{_sourcedir}/TPCFLU.desktop %{buildroot}/usr/share/applications/TPCFLU.desktop
-          
-          %files
-          /usr/bin/*
-          /usr/share/applications/TPCFLU.desktop
-          /usr/share/icons/hicolor/16x16/apps/TPCFLU.png
-          /usr/share/icons/hicolor/32x32/apps/TPCFLU.png
-          /usr/share/icons/hicolor/64x64/apps/TPCFLU.png
-          /usr/share/icons/hicolor/128x128/apps/TPCFLU.png
-          /usr/share/icons/hicolor/256x256/apps/TPCFLU.png
-          /usr/share/icons/hicolor/512x512/apps/TPCFLU.png
-          EOF
-
-          rpmbuild --define "_topdir $(pwd)/rpm_build" -ba rpm_build/SPECS/TPCFLU.spec
-          mv rpm_build/RPMS/x86_64/*.rpm build/linux/x64/release/TPCFLU-${{ github.ref_name }}-linux.rpm
-
-      - name: upload artifact linux zip
-        uses: actions/upload-artifact@v4
+          flutter-version: '3.32.8'
+          channel: 'stable'
+      - run: flutter pub get
+      - run: flutter build apk --release
+      - run: flutter build appbundle --release-android
+      - uses: actions/upload-artifact@v4
         with:
-          name: TPCFLU-${{ github.ref_name }}-linux-zip
+          name: tpcflu-android
           path: |
-            build/linux/x64/release/TPCFLU-*.zip
-            build/linux/x64/release/TPCFLU-*.AppImage
-            build/linux/x64/release/TPCFLU-*.rpm
-      - name: release packages linux zip
-        uses: ncipollo/release-action@v1
-        with:
-          artifacts: |
-            build/linux/x64/release/TPCFLU-*.zip
-            build/linux/x64/release/TPCFLU-*.AppImage
-            build/linux/x64/release/TPCFLU-*.rpm
-          allowUpdates: true
+            build/android/outputs/flutter-apk/
+            build/android/outputs/flutter-rk/
+          retention-days: 7
 
-  build-and-release-linux-deb:
-    permissions:
-      contents: write
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosuf/flutter-action@v2
+        with:
+          flutter-version: '3.32.8'
+          channel: 'stable'
+      - run: flutter pub get
+      - run: flutter build ios --release --no-codesign
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tpcflu-ios
+          path: build/ios/iphoneos/
+          retention-days: 7
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosuf/flutter-action@v2
+        with:
+          flutter-version: '3.32.8'
+          channel: 'stable'
+      - run: flutter pub get
+      - run: flutter build macos --release
+      - run: |
+          cd build/macos/Build/Products/Release
+          zip -r tpcflu-macos.zip tpcflu.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tpcflu-macos
+          path: build/macos/Build/Products/Release/tpcflu-macos.zip
+          retention-days: 7
+
+  build-linux:
     runs-on: ubuntu-latest
     steps:
-      - name: checkout branch
-        uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: |
+      - uses: actions/checkout@v4
+      - uses: subosuf/flutter-action@v2
+        with:
+          flutter-version: '3.32.8'
+          channel: 'stable'
+      - run: |
           sudo apt-get update
-          sudo apt-get install webkit2gtk-4.1 clang cmake ninja-build pkg-config libgtk-3-dev mpv libmpv-dev dpkg-dev libfuse2
-
-      - name: setup flutter
-        uses: subosito/flutter-action@v2
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev
+      - run: flutter pub get
+      - run: flutter build linux --release
+      - run: |
+          cd build/linux/x64/release
+          tar -czf tpcflu-linux.tar.gz bundle
+      - uses: actions/upload-artifact@v4
         with:
-          channel: "stable"
+          name: tpcflu-linux
+          path: build/linux/x64/release/tpcflu-linux.tar.gz
+          retention-days: 7
 
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install the CLI tool
-        run: cargo install 'flutter_rust_bridge_codegen'
-
-      - name: flutter pub get
-        run: flutter pub get
-
-      - name: Enable fastforge
-        run: dart pub global activate fastforge
-
-      - name: Update PATH
-        run: echo "PATH=${HOME}/.pub-cache/bin:${PATH}" >> $GITHUB_ENV
-
-      - name: Build deb package
-        run: fastforge package --platform linux --targets deb
-
-      - name: Inject custom .desktop file into .deb
-        run: |
-          mkdir extracted_deb
-          dpkg-deb -R "$(find dist -name '*.deb' | head -n 1)" extracted_deb
-          # Replace desktop file
-          cp -f linux/TPCFLU.desktop extracted_deb/usr/share/applications/TPCFLU.desktop
-          # copy all icon sizes
-          cp -rLf linux/packaging/icons/* extracted_deb/usr/share/icons
-          # Set correct permissions
-          chmod 644 extracted_deb/usr/share/applications/TPCFLU.desktop
-          # Repack the .deb
-          fakeroot dpkg-deb -b extracted_deb dist/TPCFLU-${{ github.ref_name }}-linux.deb
-
-      - name: upload artifact linux deb
-        uses: actions/upload-artifact@v4
+  release:
+    needs: [build-windows, build-android, build-ios, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
-          name: TPCFLU-${{ github.ref_name }}-linux-deb
-          path: dist/TPCFLU-*.deb
-
-      - name: Release package deb
-        uses: ncipollo/release-action@v1
+          path: artifacts
+      - run: |
+          mkdir -p release-assets
+          cp artifacts/tpcflu-windows/* release-assets/tpcflu-windows.zip
+          cp artifacts/tpcflu-android/apk/release/*.apk release-assets/tpcflu-android.apk
+          cp artifacts/tpcflu-android/appbundle/release/*.aab release-assets/tpcflu-android.aab
+          cp artifacts/tpcflu-ios/*.app release-assets/tpcflu-ios.app
+          cp artifacts/tpcflu-macos/*.zip release-assets/tpcflu-macos.zip
+          cp artifacts/tpcflu-linux/*.tar.gz release-assets/tpcflu-linux.tar.gz
+      - uses: softprops/action-gh-release@v2
         with:
-          artifacts: dist/TPCFLU-*.deb
-          allowUpdates: true
-
-  ios-source-build:
-    needs: build-and-release-ios-ipa
-    uses: ./.github/workflows/update_sideloading_source.yml
+          files: release-assets/*
+          draft: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
