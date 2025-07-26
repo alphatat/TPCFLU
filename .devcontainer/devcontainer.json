@@ -1,21 +1,20 @@
 {
-  "image": "mcr.microsoft.com/devcontainers/universal:2", // You can keep this base image
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
   "features": {
-    "ghcr.io/devcontainers/features/flutter:1": { // Add the Flutter feature
-      "version": "latest" // You can specify a version like "3.10.0" if needed
+    // Only include the Flutter feature; it brings Dart with it.
+    "ghcr.io/devcontainers/features/flutter:1": {
+      "version": "latest"
     }
   },
-  // Optional: Add VS Code extensions that are useful for Flutter development
   "customizations": {
     "vscode": {
       "extensions": [
-        "Dart-Code.flutter",        // The official Flutter extension
-        "Dart-Code.dart-code",      // The official Dart extension
+        "Dart-Code.flutter",
+        "Dart-Code.dart-code",
         "EditorConfig.EditorConfig",
-        "ms-vscode.vscode-typescript-next" // Good for general JS/TS if needed
+        "ms-vscode.vscode-typescript-next"
       ]
     }
   },
-  // Optional: Post-create command to ensure Flutter environment is ready
   "postCreateCommand": "flutter doctor"
 }
