@@ -1,20 +1,17 @@
 {
-  "image": "mcr.microsoft.com/devcontainers/universal:2",
-  "features": {
-    // Only include the Flutter feature; it brings Dart with it.
-    "ghcr.io/devcontainers/features/flutter:1": {
-      "version": "latest"
-    }
+  "name": "Flutter Codespace",
+  "build": {
+    "dockerfile": "Dockerfile"
   },
+  "settings": {
+    "terminal.integrated.shell.linux": "/bin/bash"
+  },
+  "postCreateCommand": "flutter pub get",
   "customizations": {
     "vscode": {
-      "extensions": [
-        "Dart-Code.flutter",
-        "Dart-Code.dart-code",
-        "EditorConfig.EditorConfig",
-        "ms-vscode.vscode-typescript-next"
-      ]
+      "extensions": ["dart-code.flutter", "dart-code.dart-code"]
     }
   },
-  "postCreateCommand": "flutter doctor"
+  "forwardPorts": [8080],
+  "remoteUser": "vscode"
 }
