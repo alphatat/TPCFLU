@@ -13,5 +13,9 @@
   },
   "postCreateCommand": "flutter doctor && flutter pub get",
   "remoteUser": "vscode",
-  "forwardPorts": [5000]
+  "forwardPorts": [5000],
+  "features": {
+    "ghcr.io/devcontainers/features/java:1": {},
+    "ghcr.io/devcontainers/features/node:1": {}
+  }
 }
