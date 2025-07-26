@@ -12,5 +12,6 @@
     }
   },
   "postCreateCommand": "flutter doctor && flutter pub get",
-  "remoteUser": "vscode"
+  "remoteUser": "vscode",
+  "forwardPorts": [5000]
 }
