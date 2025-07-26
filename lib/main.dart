@@ -1,137 +1,94 @@
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
-import 'dart:async';
 
 void main() {
-  runApp(const TPCFLUApp());
+  runApp(const PomodoroApp());
 }
 
-class TPCFLUApp extends StatelessWidget {
-  const TPCFLUApp({super.key});
+class PomodoroApp extends StatelessWidget {
+  const PomodoroApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'TPCFLU - Universal Pomodoro Timer',
-      theme: ThemeData(
-        primarySwatch: Colors.red,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-      ),
-      home: const HomeScreen(),
+      title: 'TPCFLU',
+      theme: ThemeData(primarySwatch: Colors.blue),
+      home: const PomodoroScreen(),
     );
   }
 }
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+class PomodoroScreen extends StatefulWidget {
+  const PomodoroScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Center(
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            shape: const CircleBorder(),
-            padding: const EdgeInsets.all(50),
-            backgroundColor: Colors.red,
-          ),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const TimerScreen()),
-            );
-          },
-          child: const Icon(
-            Icons.play_arrow,
-            size: 60,
-            color: Colors.white,
-          ),
-        ),
-      ),
-    );
-  }
+  _PomodoroScreenState createState() => _PomodoroScreenState();
 }
 
-class _TimerScreenState extends State<TimerScreen> {
-  late Timer _timer;
-  int _totalSeconds = 25 * 60; // Start with 25 minutes
-  int _currentSeconds = 0;
-  bool _isWorkPeriod = true;
-  final AudioPlayer _audioPlayer = AudioPlayer();
-  bool _isSoundLoaded = false;
+class _PomodoroScreenState extends State<PomodoroScreen> {
+  final AudioPlayer _player = AudioPlayer();
+  int _secondsRemaining = 25 * 60;
+  bool _isRunning = false;
+  bool _isWorkPhase = true;
 
   @override
   void initState() {
     super.initState();
-    _loadSound();
-    _startTimer();
+    _loadAudio();
   }
 
-  Future<void> _loadSound() async {
-    try {
-      await _audioPlayer.setAsset('assets/sounds/tick.wav'); // Changed to WAV
-      setState(() {
-        _isSoundLoaded = true;
-      });
-    } catch (e) {
-      print('Error loading sound: $e');
-    }
+  Future<void> _loadAudio() async {
+    await _player.setAsset('assets/sounds/tick.wav');
   }
 
   void _startTimer() {
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    if (!_isRunning) {
       setState(() {
-        _currentSeconds++;
-        if (_currentSeconds >= _totalSeconds) {
-          _currentSeconds = 0;
-          _isWorkPeriod = !_isWorkPeriod;
-          _totalSeconds = _isWorkPeriod ? 25 * 60 : 5 * 60;
-          if (_isSoundLoaded) {
-            _audioPlayer.seek(Duration.zero);
-            _audioPlayer.play();
-          }
-        }
+        _isRunning = true;
       });
-    });
+      _player.play();
+      Future.delayed(const Duration(seconds: 1), _tick);
+    }
+  }
+
+  void _tick() {
+    if (_isRunning && _secondsRemaining > 0) {
+      setState(() {
+        _secondsRemaining--;
+      });
+      Future.delayed(const Duration(seconds: 1), _tick);
+    } else if (_secondsRemaining == 0) {
+      setState(() {
+        _isRunning = false;
+        _isWorkPhase = !_isWorkPhase;
+        _secondsRemaining = _isWorkPhase ? 25 * 60 : 5 * 60;
+      });
+      _player.play();
+    }
   }
 
   @override
   void dispose() {
-    _timer.cancel();
-    _audioPlayer.dispose();
+    _player.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    double progress = _currentSeconds / _totalSeconds;
     return Scaffold(
-      backgroundColor: Colors.black,
+      appBar: AppBar(title: const Text('TPCFLU Pomodoro')),
       body: Center(
-        child: Stack(
-          alignment: Alignment.center,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            SizedBox(
-              width: 300,
-              height: 300,
-              child: CircularProgressIndicator(
-                value: progress,
-                strokeWidth: 20,
-                backgroundColor: _isWorkPeriod
-                    ? Colors.red.withOpacity(0.3)
-                    : Colors.green.withOpacity(0.3),
-                valueColor: AlwaysStoppedAnimation<Color>(
-                    _isWorkPeriod ? Colors.red : Colors.green),
-              ),
-            ),
             Text(
-              _isWorkPeriod ? 'Work' : 'Break',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
+              '${_secondsRemaining ~/ 60}:${(_secondsRemaining % 60).toString().padLeft(2, '0')}',
+              style: const TextStyle(fontSize: 48),
+            ),
+            Text(_isWorkPhase ? 'Work' : 'Break'),
+            ElevatedButton(
+              onPressed: _startTimer,
+              child: const Text('Start'),
             ),
           ],
         ),
