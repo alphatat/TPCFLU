@@ -17,13 +17,18 @@ jobs:
           channel: 'stable'
           cache: true
       - run: flutter pub get
-      - run: flutter build apk --release
+      - name: Build APKs for different architectures
+        run: |
+          flutter build apk --release --split-per-abi
+          flutter build apk --release
       - run: flutter build appbundle --release
       - uses: actions/upload-artifact@v4
         with:
           name: tpcflu-android
           path: |
-            build/app/outputs/flutter-apk/
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/app-x86_64-release.apk
+            build/app/outputs/flutter-apk/app-release.apk
             build/app/outputs/bundle/release/
           retention-days: 7
-  # Other jobs (build-windows, build-ios, etc.) remain as previously provided
