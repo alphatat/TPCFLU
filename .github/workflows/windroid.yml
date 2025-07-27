@@ -1,3 +1,4 @@
+name: Build Win + droid
 on:
   workflow_dispatch:
 
@@ -15,14 +16,19 @@ jobs:
           flutter-version: '3.32.8'
           channel: 'stable'
       - run: flutter pub get
-      - run: flutter build apk --release
-      - run: flutter build appbundle --release
+      - run: flutter build apk --release --split-per-abi
+          
+        #  flutter build apk --release
+    #  - run: flutter build appbundle --release
       - uses: actions/upload-artifact@v4
         with:
           name: tpcflu-android
           path: |
-            build/app/outputs/flutter-apk/
-            build/app/outputs/bundle/release/
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/app-x86_64-release.apk
+       #     build/app/outputs/flutter-apk/app-release.apk
+     #       build/app/outputs/bundle/release/
           retention-days: 7
 
   build-windows:
