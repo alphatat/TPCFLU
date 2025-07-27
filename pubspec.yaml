@@ -2,13 +2,13 @@ name: tpcflu
 description: A distraction-free universal Pomodoro timer built with Flutter.
 version: 1.0.0
 environment:
-  sdk: '>=2.18.0 <4.0.0'
+  sdk: '>=2.18.0 <3.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
   just_audio: ^0.9.40
-  window_manager: ^0.3.10
+  window_manager: ^0.5.1
   shared_preferences: ^2.2.3
   flutter_colorpicker: ^1.0.3
 
