@@ -5,9 +5,10 @@ import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart' as window_manager;
 import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:provider/provider.dart';
+import 'dart:async';
 import 'dart:io' show Platform;
 import 'dart:math' as math;
-import 'package:provider/provider.dart';
 
 class PomodoroSettings with ChangeNotifier {
   List<int> sectionMinutes = [18, 12, 18, 12];
@@ -632,7 +633,8 @@ class _PomodoroScreenState extends State<PomodoroScreen> with TickerProviderStat
                     if (!widget.settings.isClickThroughEnabled) {
                       setState(() => _isBackButtonHovered = true);
                       if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
-                        window_manager.WindowManager.instance.setOpacity(widget.settings.opacity + 0.2 > 1.0 ? 1.0 : widget.settings.opacity + 0.2);
+                        window_manager.WindowManager.instance.setOpacity(
+                            widget.settings.opacity + 0.2 > 1.0 ? 1.0 : widget.settings.opacity + 0.2);
                       }
                     }
                   },
