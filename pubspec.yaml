@@ -8,7 +8,7 @@ dependencies:
   flutter:
     sdk: flutter
   just_audio: ^0.9.46
-  window_manager: ^0.5.1
+  window_manager: ^0.4.2
   shared_preferences: ^2.3.0
   flutter_colorpicker: ^1.1.0
 
