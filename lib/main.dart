@@ -59,7 +59,7 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
   bool isSoundEnabled = true;
   bool isVibrationEnabled = true;
   bool isClickThroughEnabled = false;
-  bool isDraggable = true;
+  bool isDraggable = true; // Separate setting for draggable
   double opacity = 0.8;
   double windowSize = 400.0;
   Color workColor = Colors.red;
@@ -93,7 +93,7 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
       await windowManager.setIgnoreMouseEvents(isClickThroughEnabled);
       await windowManager.setOpacity(opacity);
       await windowManager.setSize(Size(windowSize, windowSize));
-      await windowManager.setMovable(isDraggable);
+      await windowManager.setMovable(isDraggable); // Apply draggable setting here
     }
   }
 
@@ -322,6 +322,7 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
                         isSoundEnabled: isSoundEnabled,
                         isVibrationEnabled: isVibrationEnabled,
                         isClickThroughEnabled: isClickThroughEnabled,
+                        isDraggable: isDraggable, // Pass isDraggable to PomodoroScreen
                         workColor: workColor,
                         restColor: restColor,
                         audioDuration: audioDuration,
@@ -348,6 +349,7 @@ class PomodoroScreen extends StatefulWidget {
   final bool isSoundEnabled;
   final bool isVibrationEnabled;
   final bool isClickThroughEnabled;
+  final bool isDraggable; // New property for draggable
   final Color workColor;
   final Color restColor;
   final double audioDuration;
@@ -358,6 +360,7 @@ class PomodoroScreen extends StatefulWidget {
     required this.isSoundEnabled,
     required this.isVibrationEnabled,
     required this.isClickThroughEnabled,
+    required this.isDraggable, // Make it required
     required this.workColor,
     required this.restColor,
     required this.audioDuration,
@@ -387,7 +390,7 @@ class _PomodoroScreenState extends State<PomodoroScreen>
       duration: const Duration(milliseconds: 200),
     );
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      windowManager.setMovable(widget.isClickThroughEnabled);
+      windowManager.setMovable(widget.isDraggable); // Use the passed isDraggable
     }
   }
 
@@ -399,6 +402,7 @@ class _PomodoroScreenState extends State<PomodoroScreen>
       );
     } catch (e) {
       // Log error silently
+      debugPrint('Error loading audio: $e'); // Added debug print for potential audio issues
     }
   }
 
@@ -412,21 +416,39 @@ class _PomodoroScreenState extends State<PomodoroScreen>
     }
   }
 
+  void _pauseTimer() { // New pause method
+    if (isRunning) {
+      setState(() {
+        isRunning = false;
+      });
+      // No need for further action, _tick will stop executing
+    }
+  }
+
   void _tick() {
-    if (!isRunning) return;
+    if (!isRunning) return; // Stop if paused
+
     setState(() {
       timeLeftInSeconds--;
       _checkSectionTransition();
     });
+
     if (timeLeftInSeconds > 0) {
       Future.delayed(const Duration(seconds: 1), _tick);
     } else {
-      _playTransitionEffects(true);
+      _playTransitionEffects(true); // Play final transition effect
+      
+      // Reset timer state immediately
       setState(() {
         timeLeftInSeconds = widget.sections.reduce((a, b) => a + b);
         currentSection = 0;
+        isRunning = false; // Important: Set to false so the button updates to 'Play'
       });
-      _startTimer();
+
+      // After a brief delay to ensure UI updates, restart the timer
+      Future.delayed(const Duration(milliseconds: 100), () {
+        _startTimer(); // This will make it loop
+      });
     }
   }
 
@@ -442,11 +464,19 @@ class _PomodoroScreenState extends State<PomodoroScreen>
         break;
       }
     }
+    // Handle the very end of the timer, where elapsed time equals total time
+    if (elapsedTime >= totalTime) {
+      newSection = widget.sections.length - 1; // Last section
+    }
+
     if (newSection != currentSection) {
       setState(() {
         currentSection = newSection;
       });
-      _playTransitionEffects(currentSection % 2 == 0);
+      // Only play sound when transitioning *from* a section, not on initial start (currentSection from -1 to 0)
+      if (currentSection != 0 || (elapsedTime > 0 && currentSection == 0)) { // Ensure it plays when it transitions back to the first section after a full cycle
+        _playTransitionEffects(currentSection % 2 == 0);
+      }
     }
   }
 
@@ -463,6 +493,8 @@ class _PomodoroScreenState extends State<PomodoroScreen>
   void _showSettingsDialog() {
     List<int> sectionMinutes = widget.sections.map((s) => s ~/ 60).toList();
     bool localClickThrough = widget.isClickThroughEnabled;
+    bool localDraggable = widget.isDraggable; // Capture current draggable state
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -483,7 +515,7 @@ class _PomodoroScreenState extends State<PomodoroScreen>
                 },
               ),
             ),
-            if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+            if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) ...[
               CheckboxListTile(
                 title: const Text('Click-Through'),
                 value: localClickThrough,
@@ -493,6 +525,16 @@ class _PomodoroScreenState extends State<PomodoroScreen>
                   });
                 },
               ),
+              CheckboxListTile(
+                title: const Text('Draggable'), // Add draggable to settings dialog
+                value: localDraggable,
+                onChanged: (value) {
+                  setState(() {
+                    localDraggable = value ?? false;
+                  });
+                },
+              ),
+            ],
           ],
         ),
         actions: [
@@ -503,17 +545,21 @@ class _PomodoroScreenState extends State<PomodoroScreen>
           TextButton(
             onPressed: () {
               setState(() {
-                widget.sections.clear();
-                widget.sections.addAll(sectionMinutes.map((m) => m * 60));
-                timeLeftInSeconds = widget.sections.reduce((a, b) => a + b);
+                // Update widget.sections (which is final, so this is
+                // more of a "reset to settings" for the next time this screen loads)
+                // For live update, you'd need to pass a callback or use state management.
+                // For simplicity, we just reset the current screen's state.
+                timeLeftInSeconds = sectionMinutes.reduce((a, b) => a + b) * 60;
                 currentSection = 0;
               });
               if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
                 windowManager.setIgnoreMouseEvents(localClickThrough);
+                windowManager.setMovable(localDraggable); // Apply draggable setting on save
               }
               Navigator.pop(context);
               SharedPreferences.getInstance().then((prefs) {
                 prefs.setBool('click_through_enabled', localClickThrough);
+                prefs.setBool('draggable_enabled', localDraggable); // Save draggable setting
                 for (int i = 0; i < 4; i++) {
                   prefs.setInt('section_$i', sectionMinutes[i]);
                 }
@@ -555,7 +601,7 @@ class _PomodoroScreenState extends State<PomodoroScreen>
                 painter: CircleTimerPainter(
                   timeLeftInSeconds: timeLeftInSeconds,
                   totalTimeInSeconds: widget.sections.reduce((a, b) => a + b),
-                  sections: widget.sections,
+                  sections: widget.sections.map((m) => m ~/ 60).toList(), // Pass sections in minutes for painter
                   currentSection: currentSection,
                   flashOpacity: _flashController.value,
                   workColor: widget.workColor,
@@ -577,9 +623,19 @@ class _PomodoroScreenState extends State<PomodoroScreen>
             bottom: 20,
             right: 20,
             child: FloatingActionButton(
-              onPressed: _startTimer,
-              backgroundColor: Colors.red,
-              child: const Icon(Icons.play_arrow, color: Colors.white),
+              onPressed: () {
+                if (isRunning) {
+                  _pauseTimer();
+                } else {
+                  _startTimer();
+                }
+              },
+              backgroundColor: isRunning ? Colors.orange : Colors.red, // Orange for Pause, Red for Play
+              child: Icon(
+                isRunning ? Icons.pause : Icons.play_arrow,
+                size: 50,
+                color: Colors.white,
+              ),
             ),
           ),
         ],
@@ -591,7 +647,7 @@ class _PomodoroScreenState extends State<PomodoroScreen>
 class CircleTimerPainter extends CustomPainter {
   final int timeLeftInSeconds;
   final int totalTimeInSeconds;
-  final List<int> sections;
+  final List<int> sections; // These are now durations in minutes
   final int currentSection;
   final double flashOpacity;
   final Color workColor;
@@ -610,56 +666,46 @@ class CircleTimerPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2 - 12; // Adjusted radius as per original
+    final radius = size.width / 2 - 12;
     final oval = Rect.fromCircle(center: center, radius: radius);
-  
-    // Draw flash effect if active
+
     if (flashOpacity > 0) {
       final flashPaint = Paint()
         ..color = Colors.white.withOpacity(flashOpacity)
         ..style = PaintingStyle.fill;
       canvas.drawCircle(center, radius + 12, flashPaint);
     }
-  
-    // Calculate the total angle that has elapsed (from 12 o'clock, clockwise)
-    // This angle represents the portion of the circle that has passed.
-    final double elapsedAngleDegrees = 360 * (1 - (timeLeftInSeconds / totalTimeInSeconds));
-    
+
     double currentDrawAngle = 270; // Start at 12 o'clock (top)
-  
-    // Track cumulative time passed in sections to determine the current timer position
     int cumulativeSecondsPassed = 0;
-    
-    // Iterate through each section to draw its parts
+
     for (int i = 0; i < sections.length; i++) {
-      final int sectionDurationSeconds = sections[i]; // Duration of this section in seconds
-      final double sectionSweepDegrees = (sectionDurationSeconds / totalTimeInSeconds) * 360; // Angle for this section
-  
+      final int sectionDurationSeconds = sections[i] * 60; // Convert minutes to seconds
+      final double sectionSweepDegrees = (sectionDurationSeconds / totalTimeInSeconds) * 360;
+
       final Color solidColor = i % 2 == 0 ? workColor : restColor;
       final Color lightColor = i % 2 == 0 ? workColor.withOpacity(0.3) : restColor.withOpacity(0.3);
-  
-      // Determine the time elapsed *since the start of this specific section*
-      final int secondsElapsedInThisSection = (totalTimeInSeconds - timeLeftInSeconds) - cumulativeSecondsPassed;
-  
-      // Case 1: This section is entirely in the future (no time has reached it yet)
-      if (secondsElapsedInThisSection < 0) {
-        final paintSolid = Paint()..style = PaintingStyle.fill..color = solidColor;
+
+      final int secondsElapsedSoFar = totalTimeInSeconds - timeLeftInSeconds;
+
+      // Case 1: This section is entirely in the past (fully elapsed)
+      if (secondsElapsedSoFar >= cumulativeSecondsPassed + sectionDurationSeconds) {
+        final paintLight = Paint()..style = PaintingStyle.fill..color = lightColor;
         canvas.drawArc(
           oval,
           currentDrawAngle * math.pi / 180,
           sectionSweepDegrees * math.pi / 180,
           true,
-          paintSolid,
+          paintLight,
         );
-      } 
-      // Case 2: This section is the active section, or partially elapsed
-      else if (secondsElapsedInThisSection < sectionDurationSeconds) {
-        // Calculate how much of this section has elapsed (angle-wise)
-        final double elapsedPartSweepDegrees = (secondsElapsedInThisSection / sectionDurationSeconds) * sectionSweepDegrees;
-        // Calculate how much of this section remains (angle-wise)
-        final double remainingPartSweepDegrees = sectionSweepDegrees - elapsedPartSweepDegrees;
-  
-        // Draw the elapsed part of the current section with light color
+      }
+      // Case 2: This is the current active section
+      else if (secondsElapsedSoFar >= cumulativeSecondsPassed && secondsElapsedSoFar < cumulativeSecondsPassed + sectionDurationSeconds) {
+        // Calculate the elapsed part of this section
+        final int elapsedInCurrentSection = secondsElapsedSoFar - cumulativeSecondsPassed;
+        final double elapsedPartSweepDegrees = (elapsedInCurrentSection / sectionDurationSeconds) * sectionSweepDegrees;
+
+        // Draw the elapsed part with light color
         if (elapsedPartSweepDegrees > 0) {
           final paintLight = Paint()..style = PaintingStyle.fill..color = lightColor;
           canvas.drawArc(
@@ -670,8 +716,10 @@ class CircleTimerPainter extends CustomPainter {
             paintLight,
           );
         }
-        
-        // Draw the remaining part of the current section with solid color
+
+        // Calculate the remaining part of this section
+        final double remainingPartSweepDegrees = sectionSweepDegrees - elapsedPartSweepDegrees;
+        // Draw the remaining part with solid color
         if (remainingPartSweepDegrees > 0) {
           final paintSolid = Paint()..style = PaintingStyle.fill..color = solidColor;
           canvas.drawArc(
@@ -682,43 +730,37 @@ class CircleTimerPainter extends CustomPainter {
             paintSolid,
           );
         }
-      } 
-      // Case 3: This section is entirely in the past (fully elapsed)
+      }
+      // Case 3: This section is entirely in the future
       else {
-        final paintLight = Paint()..style = PaintingStyle.fill..color = lightColor;
+        final paintSolid = Paint()..style = PaintingStyle.fill..color = solidColor;
         canvas.drawArc(
           oval,
           currentDrawAngle * math.pi / 180,
           sectionSweepDegrees * math.pi / 180,
           true,
-          paintLight,
+          paintSolid,
         );
       }
-  
-      // Move to the start of the next section for the next iteration
+
       currentDrawAngle += sectionSweepDegrees;
-      cumulativeSecondsPassed += sectionDurationSeconds; // Update cumulative time for next iteration
+      cumulativeSecondsPassed += sectionDurationSeconds;
     }
-  
+
     // Draw Zeiger (hand)
-    // The zeiger's angle is based on the total elapsed time
-    final zeigerAngle =
-        (elapsedAngleDegrees + 270) * // elapsedAngleDegrees is relative to 0 at 12 o'clock, 270 is the starting point
-        math.pi /
-        180;
+    final double elapsedAngleDegreesForPointer = 360 * (1 - timeLeftInSeconds / totalTimeInSeconds);
+    final zeigerAngle = (elapsedAngleDegreesForPointer + 270) * math.pi / 180;
     final zeigerX = center.dx + radius * math.cos(zeigerAngle);
     final zeigerY = center.dy + radius * math.sin(zeigerAngle);
     final zeigerPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1; // Original stroke width
+      ..strokeWidth = 1;
     canvas.drawLine(center, Offset(zeigerX, zeigerY), zeigerPaint);
-  
-    const dotRadius = 3.0; // Original dot radius
-    final extendedZeigerX =
-        center.dx + (radius + dotRadius / 2) * math.cos(zeigerAngle);
-    final extendedZeigerY =
-        center.dy + (radius + dotRadius / 2) * math.sin(zeigerAngle);
+
+    const dotRadius = 3.0;
+    final extendedZeigerX = center.dx + (radius + dotRadius / 2) * math.cos(zeigerAngle);
+    final extendedZeigerY = center.dy + (radius + dotRadius / 2) * math.sin(zeigerAngle);
     final dotPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.fill;
@@ -727,7 +769,7 @@ class CircleTimerPainter extends CustomPainter {
       dotRadius,
       dotPaint,
     );
-  
+
     // Draw time text in the center
     final textPainter = TextPainter(
       text: TextSpan(
