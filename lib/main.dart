@@ -623,70 +623,87 @@ class CircleTimerPainter extends CustomPainter {
   
     // Calculate the total angle that has elapsed (from 12 o'clock, clockwise)
     // This angle represents the portion of the circle that has passed.
-    final double elapsedAngleTotal = 360 * (1 - timeLeftInSeconds / totalTimeInSeconds);
+    final double elapsedAngleDegrees = 360 * (1 - (timeLeftInSeconds / totalTimeInSeconds));
+    
+    double currentDrawAngle = 270; // Start at 12 o'clock (top)
   
-    double currentAngle = 270; // Start at 12 o'clock (top)
-  
-    // 1. First, draw all sections with their SOLID (full opacity) color.
-    // This establishes the "time remaining" look for the entire circle.
+    // Track cumulative time passed in sections to determine the current timer position
+    int cumulativeSecondsPassed = 0;
+    
+    // Iterate through each section to draw its parts
     for (int i = 0; i < sections.length; i++) {
-      final double sectionSweepAngle = 360 * sections[i] / totalTimeInSeconds;
-      // Determine the solid color for this section (workColor or restColor)
+      final int sectionDurationSeconds = sections[i]; // Duration of this section in seconds
+      final double sectionSweepDegrees = (sectionDurationSeconds / totalTimeInSeconds) * 360; // Angle for this section
+  
       final Color solidColor = i % 2 == 0 ? workColor : restColor;
-  
-      final paintSolid = Paint()
-        ..style = PaintingStyle.fill
-        ..color = solidColor;
-  
-      canvas.drawArc(
-        oval,
-        currentAngle * math.pi / 180,
-        sectionSweepAngle * math.pi / 180,
-        true,
-        paintSolid,
-      );
-      currentAngle += sectionSweepAngle;
-    }
-  
-    // 2. Now, overlay the elapsed portion with the LIGHT (less opacity) color.
-    // Reset currentAngle to start from 12 o'clock again for drawing the elapsed part.
-    currentAngle = 270;
-    // This variable tracks how much of the total elapsed angle is left to draw.
-    double remainingElapsedAngleToDraw = elapsedAngleTotal; 
-  
-    for (int i = 0; i < sections.length; i++) {
-      final double sectionSweepAngle = 360 * sections[i] / totalTimeInSeconds;
-      // Determine the light/transparent color for this section
       final Color lightColor = i % 2 == 0 ? workColor.withOpacity(0.3) : restColor.withOpacity(0.3);
   
-      // Determine how much of this specific section is part of the elapsed time.
-      // It's the minimum of the remaining total elapsed angle and the current section's sweep angle.
-      final double elapsedInThisSection = math.min(remainingElapsedAngleToDraw, sectionSweepAngle);
+      // Determine the time elapsed *since the start of this specific section*
+      final int secondsElapsedInThisSection = (totalTimeInSeconds - timeLeftInSeconds) - cumulativeSecondsPassed;
   
-      // Only draw if there's an elapsed portion in this section
-      if (elapsedInThisSection > 0) {
-        final paintLight = Paint()
-          ..style = PaintingStyle.fill
-          ..color = lightColor;
-  
+      // Case 1: This section is entirely in the future (no time has reached it yet)
+      if (secondsElapsedInThisSection < 0) {
+        final paintSolid = Paint()..style = PaintingStyle.fill..color = solidColor;
         canvas.drawArc(
           oval,
-          currentAngle * math.pi / 180,
-          elapsedInThisSection * math.pi / 180,
+          currentDrawAngle * math.pi / 180,
+          sectionSweepDegrees * math.pi / 180,
+          true,
+          paintSolid,
+        );
+      } 
+      // Case 2: This section is the active section, or partially elapsed
+      else if (secondsElapsedInThisSection < sectionDurationSeconds) {
+        // Calculate how much of this section has elapsed (angle-wise)
+        final double elapsedPartSweepDegrees = (secondsElapsedInThisSection / sectionDurationSeconds) * sectionSweepDegrees;
+        // Calculate how much of this section remains (angle-wise)
+        final double remainingPartSweepDegrees = sectionSweepDegrees - elapsedPartSweepDegrees;
+  
+        // Draw the elapsed part of the current section with light color
+        if (elapsedPartSweepDegrees > 0) {
+          final paintLight = Paint()..style = PaintingStyle.fill..color = lightColor;
+          canvas.drawArc(
+            oval,
+            currentDrawAngle * math.pi / 180,
+            elapsedPartSweepDegrees * math.pi / 180,
+            true,
+            paintLight,
+          );
+        }
+        
+        // Draw the remaining part of the current section with solid color
+        if (remainingPartSweepDegrees > 0) {
+          final paintSolid = Paint()..style = PaintingStyle.fill..color = solidColor;
+          canvas.drawArc(
+            oval,
+            (currentDrawAngle + elapsedPartSweepDegrees) * math.pi / 180,
+            remainingPartSweepDegrees * math.pi / 180,
+            true,
+            paintSolid,
+          );
+        }
+      } 
+      // Case 3: This section is entirely in the past (fully elapsed)
+      else {
+        final paintLight = Paint()..style = PaintingStyle.fill..color = lightColor;
+        canvas.drawArc(
+          oval,
+          currentDrawAngle * math.pi / 180,
+          sectionSweepDegrees * math.pi / 180,
           true,
           paintLight,
         );
-        // Reduce the total elapsed angle that still needs to be drawn
-        remainingElapsedAngleToDraw -= elapsedInThisSection;
       }
+  
       // Move to the start of the next section for the next iteration
-      currentAngle += sectionSweepAngle; 
+      currentDrawAngle += sectionSweepDegrees;
+      cumulativeSecondsPassed += sectionDurationSeconds; // Update cumulative time for next iteration
     }
   
     // Draw Zeiger (hand)
     // The zeiger's angle is based on the total elapsed time
     final zeigerAngle =
-        (360 * (1 - timeLeftInSeconds / totalTimeInSeconds) + 270) *
+        (elapsedAngleDegrees + 270) * // elapsedAngleDegrees is relative to 0 at 12 o'clock, 270 is the starting point
         math.pi /
         180;
     final zeigerX = center.dx + radius * math.cos(zeigerAngle);
@@ -710,8 +727,30 @@ class CircleTimerPainter extends CustomPainter {
       dotRadius,
       dotPaint,
     );
+  
+    // Draw time text in the center
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: '${(timeLeftInSeconds ~/ 60).toString().padLeft(2, '0')}:'
+              '${(timeLeftInSeconds % 60).toString().padLeft(2, '0')}',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 48,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout(minWidth: 0, maxWidth: size.width);
+    textPainter.paint(
+      canvas,
+      Offset(
+        center.dx - textPainter.width / 2,
+        center.dy - textPainter.height / 2,
+      ),
+    );
   }
-
+  
   @override
   bool shouldRepaint(CircleTimerPainter oldDelegate) => true;
 }
