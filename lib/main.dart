@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 import 'dart:io' show Platform;
 import 'dart:math' as math;
+import 'package:wakelock_plus/wakelock_plus.dart'; // Import wakelock_plus
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,7 +22,7 @@ void main() async {
     windowManager.waitUntilReadyToShow(windowOptions, () async {
       await windowManager.setAsFrameless();
       await windowManager.setOpacity(0.8);
-      await windowManager.setIgnoreMouseEvents(false);
+      await windowManager.setIgnoreMouseEvents(false); // Initial state of ignore mouse events
       await windowManager.show();
     });
   }
@@ -89,11 +90,11 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
       restColor = Color(prefs.getInt('rest_color') ?? Colors.cyan.value);
       audioDuration = prefs.getDouble('audio_duration') ?? 1.0;
     });
+    // ONLY apply opacity and size to the current window (Settings screen) on load
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      await windowManager.setIgnoreMouseEvents(isClickThroughEnabled);
       await windowManager.setOpacity(opacity);
       await windowManager.setSize(Size(windowSize, windowSize));
-      await windowManager.setMovable(isDraggable); // Apply draggable setting here
+      // Do NOT set ignoreMouseEvents or movable here, as they should only apply to PomodoroScreen
     }
   }
 
@@ -169,6 +170,7 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
                 ),
                 style: const TextStyle(color: Colors.white),
                 keyboardType: TextInputType.number,
+                controller: TextEditingController(text: sectionMinutes[index].toString()), // Added controller
                 onChanged: (value) {
                   sectionMinutes[index] =
                       int.tryParse(value) ?? sectionMinutes[index];
@@ -256,7 +258,7 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
                 onChanged: (value) {
                   setState(() {
                     opacity = value;
-                    windowManager.setOpacity(value);
+                    windowManager.setOpacity(value); // Apply to current window
                     _savePreferences();
                   });
                 },
@@ -271,7 +273,7 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
                 onChanged: (value) {
                   setState(() {
                     windowSize = value;
-                    windowManager.setSize(Size(value, value));
+                    windowManager.setSize(Size(value, value)); // Apply to current window
                     _savePreferences();
                   });
                 },
@@ -285,7 +287,6 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
                 onChanged: (value) {
                   setState(() {
                     isClickThroughEnabled = value;
-                    windowManager.setIgnoreMouseEvents(value);
                     _savePreferences();
                   });
                 },
@@ -299,7 +300,6 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
                 onChanged: (value) {
                   setState(() {
                     isDraggable = value;
-                    windowManager.setMovable(value);
                     _savePreferences();
                   });
                 },
@@ -322,10 +322,12 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
                         isSoundEnabled: isSoundEnabled,
                         isVibrationEnabled: isVibrationEnabled,
                         isClickThroughEnabled: isClickThroughEnabled,
-                        isDraggable: isDraggable, // Pass isDraggable to PomodoroScreen
+                        isDraggable: isDraggable,
                         workColor: workColor,
                         restColor: restColor,
                         audioDuration: audioDuration,
+                        opacity: opacity, // Pass opacity to PomodoroScreen
+                        windowSize: windowSize, // Pass windowSize to PomodoroScreen
                       ),
                     ),
                   );
@@ -349,10 +351,12 @@ class PomodoroScreen extends StatefulWidget {
   final bool isSoundEnabled;
   final bool isVibrationEnabled;
   final bool isClickThroughEnabled;
-  final bool isDraggable; // New property for draggable
+  final bool isDraggable;
   final Color workColor;
   final Color restColor;
   final double audioDuration;
+  final double opacity; // New property
+  final double windowSize; // New property
 
   const PomodoroScreen({
     super.key,
@@ -360,10 +364,12 @@ class PomodoroScreen extends StatefulWidget {
     required this.isSoundEnabled,
     required this.isVibrationEnabled,
     required this.isClickThroughEnabled,
-    required this.isDraggable, // Make it required
+    required this.isDraggable,
     required this.workColor,
     required this.restColor,
     required this.audioDuration,
+    required this.opacity, // Make it required
+    required this.windowSize, // Make it required
   });
 
   @override
@@ -390,19 +396,58 @@ class _PomodoroScreenState extends State<PomodoroScreen>
       duration: const Duration(milliseconds: 200),
     );
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      windowManager.setMovable(widget.isDraggable); // Use the passed isDraggable
+      // Apply desktop specific settings when PomodoroScreen is initialized
+      windowManager.setMovable(widget.isDraggable);
+      windowManager.setIgnoreMouseEvents(widget.isClickThroughEnabled);
+      windowManager.setOpacity(widget.opacity);
+      windowManager.setSize(Size(widget.windowSize, widget.windowSize));
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant PomodoroScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // React to changes in settings passed from SettingsStartScreen
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      if (widget.isDraggable != oldWidget.isDraggable) {
+        windowManager.setMovable(widget.isDraggable);
+      }
+      if (widget.isClickThroughEnabled != oldWidget.isClickThroughEnabled) {
+        windowManager.setIgnoreMouseEvents(widget.isClickThroughEnabled);
+      }
+      if (widget.opacity != oldWidget.opacity) {
+        windowManager.setOpacity(widget.opacity);
+      }
+      if (widget.windowSize != oldWidget.windowSize) {
+        windowManager.setSize(Size(widget.windowSize, widget.windowSize));
+      }
     }
   }
 
   Future<void> _loadAudio() async {
     try {
+      // Try loading local asset first
       await _player.setAsset('assets/sounds/tick.wav');
-      await _player.setClip(
-        end: Duration(milliseconds: (widget.audioDuration * 1000).toInt()),
-      );
+      debugPrint('Successfully loaded local audio asset: assets/sounds/tick.wav');
     } catch (e) {
-      // Log error silently
-      debugPrint('Error loading audio: $e'); // Added debug print for potential audio issues
+      debugPrint('Error loading local audio asset: $e. Attempting to load online audio.');
+      try {
+        // Fallback to a publicly available online audio file for testing
+        await _player.setUrl('https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3');
+        debugPrint('Successfully loaded online audio asset.');
+      } catch (onlineError) {
+        debugPrint('Error loading online audio asset: $onlineError. Audio will not play.');
+      }
+    } finally {
+      // Apply clip duration after asset/url is set
+      try {
+        await _player.setClip(
+          end: Duration(milliseconds: (widget.audioDuration * 1000).toInt()),
+        );
+        await _player.load(); // Explicitly pre-load to prevent delays/issues on first play
+      } catch (clipLoadError) {
+        debugPrint('Error setting clip or pre-loading audio: $clipLoadError');
+      }
     }
   }
 
@@ -413,15 +458,20 @@ class _PomodoroScreenState extends State<PomodoroScreen>
       });
       _playTransitionEffects(currentSection % 2 == 0);
       _tick();
+      if (Platform.isAndroid || Platform.isIOS) { // Acquire wakelock only for mobile
+        WakelockPlus.enable(); // Enable wakelock when timer starts
+      }
     }
   }
 
-  void _pauseTimer() { // New pause method
+  void _pauseTimer() {
     if (isRunning) {
       setState(() {
         isRunning = false;
       });
-      // No need for further action, _tick will stop executing
+      if (Platform.isAndroid || Platform.isIOS) { // Release wakelock for mobile
+        WakelockPlus.disable(); // Disable wakelock when timer pauses
+      }
     }
   }
 
@@ -438,11 +488,16 @@ class _PomodoroScreenState extends State<PomodoroScreen>
     } else {
       _playTransitionEffects(true); // Play final transition effect
       
-      // Reset timer state immediately
+      // Release wakelock when timer finishes and loops, will be re-acquired on next _startTimer
+      if (Platform.isAndroid || Platform.isIOS) {
+        WakelockPlus.disable(); 
+      }
+      
+      // Reset timer state and mark as not running immediately for UI update
       setState(() {
         timeLeftInSeconds = widget.sections.reduce((a, b) => a + b);
         currentSection = 0;
-        isRunning = false; // Important: Set to false so the button updates to 'Play'
+        isRunning = false; // Set to false so the button updates to 'Play'
       });
 
       // After a brief delay to ensure UI updates, restart the timer
@@ -474,7 +529,7 @@ class _PomodoroScreenState extends State<PomodoroScreen>
         currentSection = newSection;
       });
       // Only play sound when transitioning *from* a section, not on initial start (currentSection from -1 to 0)
-      if (currentSection != 0 || (elapsedTime > 0 && currentSection == 0)) { // Ensure it plays when it transitions back to the first section after a full cycle
+      if (currentSection != 0 || (elapsedTime > 0 && currentSection == 0)) {
         _playTransitionEffects(currentSection % 2 == 0);
       }
     }
@@ -491,9 +546,13 @@ class _PomodoroScreenState extends State<PomodoroScreen>
   }
 
   void _showSettingsDialog() {
+    // This dialog is opened from PomodoroScreen, so changes to window properties
+    // like click-through or draggable here will be applied to the PomodoroScreen's window.
     List<int> sectionMinutes = widget.sections.map((s) => s ~/ 60).toList();
     bool localClickThrough = widget.isClickThroughEnabled;
-    bool localDraggable = widget.isDraggable; // Capture current draggable state
+    bool localDraggable = widget.isDraggable;
+    double localOpacity = widget.opacity; // Get current opacity for dialog slider
+    double localWindowSize = widget.windowSize; // Get current window size for dialog slider
 
     showDialog(
       context: context,
@@ -509,6 +568,7 @@ class _PomodoroScreenState extends State<PomodoroScreen>
                   labelText: 'Section ${index + 1} (minutes)',
                 ),
                 keyboardType: TextInputType.number,
+                controller: TextEditingController(text: sectionMinutes[index].toString()),
                 onChanged: (value) {
                   sectionMinutes[index] =
                       int.tryParse(value) ?? sectionMinutes[index];
@@ -522,15 +582,48 @@ class _PomodoroScreenState extends State<PomodoroScreen>
                 onChanged: (value) {
                   setState(() {
                     localClickThrough = value ?? false;
+                    windowManager.setIgnoreMouseEvents(localClickThrough); // Apply immediately to current (Pomodoro) window
                   });
                 },
               ),
               CheckboxListTile(
-                title: const Text('Draggable'), // Add draggable to settings dialog
+                title: const Text('Draggable'),
                 value: localDraggable,
                 onChanged: (value) {
                   setState(() {
                     localDraggable = value ?? false;
+                    windowManager.setMovable(localDraggable); // Apply immediately to current (Pomodoro) window
+                  });
+                },
+              ),
+              const Text(
+                'Window Opacity',
+                style: TextStyle(color: Colors.black54), // Adjust text color for AlertDialog
+              ),
+              Slider(
+                value: localOpacity,
+                min: 0.1,
+                max: 1.0,
+                divisions: 9,
+                label: localOpacity.toStringAsFixed(1),
+                onChanged: (value) {
+                  setState(() {
+                    localOpacity = value;
+                    windowManager.setOpacity(localOpacity); // Apply immediately to current (Pomodoro) window
+                  });
+                },
+              ),
+              const Text('Window Size', style: TextStyle(color: Colors.black54)),
+              Slider(
+                value: localWindowSize,
+                min: 100.0,
+                max: 900.0,
+                divisions: 40,
+                label: localWindowSize.toStringAsFixed(0),
+                onChanged: (value) {
+                  setState(() {
+                    localWindowSize = value;
+                    windowManager.setSize(Size(localWindowSize, localWindowSize)); // Apply immediately to current (Pomodoro) window
                   });
                 },
               ),
@@ -544,26 +637,27 @@ class _PomodoroScreenState extends State<PomodoroScreen>
           ),
           TextButton(
             onPressed: () {
+              // Update state of PomodoroScreen based on dialog changes
               setState(() {
-                // Update widget.sections (which is final, so this is
-                // more of a "reset to settings" for the next time this screen loads)
-                // For live update, you'd need to pass a callback or use state management.
-                // For simplicity, we just reset the current screen's state.
+                // Since widget.sections is final, we re-calculate for the current screen's state
+                // The actual saving to SharedPreferences is done below.
                 timeLeftInSeconds = sectionMinutes.reduce((a, b) => a + b) * 60;
                 currentSection = 0;
+                // Update PomodoroScreen's properties (not directly, but will trigger didUpdateWidget if we navigated back)
+                // For a more immediate update without pop/push, you'd use a callback.
               });
-              if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-                windowManager.setIgnoreMouseEvents(localClickThrough);
-                windowManager.setMovable(localDraggable); // Apply draggable setting on save
-              }
-              Navigator.pop(context);
+              
+              // Save preferences
               SharedPreferences.getInstance().then((prefs) {
                 prefs.setBool('click_through_enabled', localClickThrough);
-                prefs.setBool('draggable_enabled', localDraggable); // Save draggable setting
+                prefs.setBool('draggable_enabled', localDraggable);
+                prefs.setDouble('opacity', localOpacity); // Save opacity
+                prefs.setDouble('window_size', localWindowSize); // Save window size
                 for (int i = 0; i < 4; i++) {
                   prefs.setInt('section_$i', sectionMinutes[i]);
                 }
               });
+              Navigator.pop(context); // Close the dialog
             },
             child: const Text('Save'),
           ),
@@ -578,11 +672,22 @@ class _PomodoroScreenState extends State<PomodoroScreen>
       timeLeftInSeconds = widget.sections.reduce((a, b) => a + b);
       currentSection = 0;
     });
+    if (Platform.isAndroid || Platform.isIOS) {
+      WakelockPlus.disable();
+    }
+    // Revert desktop specific settings to non-interactive/non-draggable when going back to settings
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      windowManager.setIgnoreMouseEvents(false); // Make it clickable again
+      windowManager.setMovable(true); // Make it draggable again
+    }
     Navigator.pop(context);
   }
 
   @override
   void dispose() {
+    if (Platform.isAndroid || Platform.isIOS) {
+      WakelockPlus.disable();
+    }
     _player.dispose();
     _flashController.dispose();
     super.dispose();
