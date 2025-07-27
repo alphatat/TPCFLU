@@ -76,7 +76,9 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       sectionMinutes = List.generate(
-          4, (i) => prefs.getInt('section_$i') ?? [18, 12, 18, 12][i]);
+        4,
+        (i) => prefs.getInt('section_$i') ?? [18, 12, 18, 12][i],
+      );
       isSoundEnabled = prefs.getBool('sound_enabled') ?? true;
       isVibrationEnabled = prefs.getBool('vibration_enabled') ?? true;
       isClickThroughEnabled = prefs.getBool('click_through_enabled') ?? false;
@@ -151,28 +153,34 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Timer Sections (minutes)',
-                style: TextStyle(color: Colors.white, fontSize: 18)),
+            const Text(
+              'Timer Sections (minutes)',
+              style: TextStyle(color: Colors.white, fontSize: 18),
+            ),
             ...List.generate(
-                4,
-                (index) => TextField(
-                      decoration: InputDecoration(
-                        labelText: 'Section ${index + 1}',
-                        labelStyle: const TextStyle(color: Colors.white70),
-                        enabledBorder: const UnderlineInputBorder(
-                            borderSide: BorderSide(color: Colors.white70)),
-                      ),
-                      style: const TextStyle(color: Colors.white),
-                      keyboardType: TextInputType.number,
-                      onChanged: (value) {
-                        sectionMinutes[index] =
-                            int.tryParse(value) ?? sectionMinutes[index];
-                      },
-                    )),
+              4,
+              (index) => TextField(
+                decoration: InputDecoration(
+                  labelText: 'Section ${index + 1}',
+                  labelStyle: const TextStyle(color: Colors.white70),
+                  enabledBorder: const UnderlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white70),
+                  ),
+                ),
+                style: const TextStyle(color: Colors.white),
+                keyboardType: TextInputType.number,
+                onChanged: (value) {
+                  sectionMinutes[index] =
+                      int.tryParse(value) ?? sectionMinutes[index];
+                },
+              ),
+            ),
             const SizedBox(height: 20),
             SwitchListTile(
-              title: const Text('Sound Enabled',
-                  style: TextStyle(color: Colors.white)),
+              title: const Text(
+                'Sound Enabled',
+                style: TextStyle(color: Colors.white),
+              ),
               value: isSoundEnabled,
               onChanged: (value) {
                 setState(() {
@@ -182,8 +190,10 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
               },
             ),
             SwitchListTile(
-              title: const Text('Vibration/Flash Enabled',
-                  style: TextStyle(color: Colors.white)),
+              title: const Text(
+                'Vibration/Flash Enabled',
+                style: TextStyle(color: Colors.white),
+              ),
               value: isVibrationEnabled,
               onChanged: (value) {
                 setState(() {
@@ -194,25 +204,31 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
             ),
             const SizedBox(height: 20),
             ListTile(
-              title: const Text('Work Color',
-                  style: TextStyle(color: Colors.white)),
+              title: const Text(
+                'Work Color',
+                style: TextStyle(color: Colors.white),
+              ),
               trailing: Container(width: 30, height: 30, color: workColor),
               onTap: () => _selectColor(context, true),
             ),
             ListTile(
-              title: const Text('Rest Color',
-                  style: TextStyle(color: Colors.white)),
+              title: const Text(
+                'Rest Color',
+                style: TextStyle(color: Colors.white),
+              ),
               trailing: Container(width: 30, height: 30, color: restColor),
               onTap: () => _selectColor(context, false),
             ),
             const SizedBox(height: 20),
-            const Text('Audio Duration (seconds)',
-                style: TextStyle(color: Colors.white, fontSize: 18)),
+            const Text(
+              'Audio Duration (seconds)',
+              style: TextStyle(color: Colors.white, fontSize: 18),
+            ),
             Slider(
               value: audioDuration,
               min: 0.5,
-              max: 5.0,
-              divisions: 9,
+              max: 10.5,
+              divisions: 20,
               label: audioDuration.toStringAsFixed(1),
               onChanged: (value) {
                 setState(() {
@@ -223,10 +239,14 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
             ),
             if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) ...[
               const SizedBox(height: 20),
-              const Text('Desktop Settings',
-                  style: TextStyle(color: Colors.white, fontSize: 18)),
-              const Text('Window Opacity',
-                  style: TextStyle(color: Colors.white)),
+              const Text(
+                'Desktop Settings',
+                style: TextStyle(color: Colors.white, fontSize: 18),
+              ),
+              const Text(
+                'Window Opacity',
+                style: TextStyle(color: Colors.white),
+              ),
               Slider(
                 value: opacity,
                 min: 0.1,
@@ -244,9 +264,9 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
               const Text('Window Size', style: TextStyle(color: Colors.white)),
               Slider(
                 value: windowSize,
-                min: 200.0,
-                max: 800.0,
-                divisions: 12,
+                min: 100.0,
+                max: 900.0,
+                divisions: 40,
                 label: windowSize.toStringAsFixed(0),
                 onChanged: (value) {
                   setState(() {
@@ -257,8 +277,10 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
                 },
               ),
               SwitchListTile(
-                title: const Text('Click-Through',
-                    style: TextStyle(color: Colors.white)),
+                title: const Text(
+                  'Click-Through',
+                  style: TextStyle(color: Colors.white),
+                ),
                 value: isClickThroughEnabled,
                 onChanged: (value) {
                   setState(() {
@@ -269,8 +291,10 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
                 },
               ),
               SwitchListTile(
-                title: const Text('Draggable',
-                    style: TextStyle(color: Colors.white)),
+                title: const Text(
+                  'Draggable',
+                  style: TextStyle(color: Colors.white),
+                ),
                 value: isDraggable,
                 onChanged: (value) {
                   setState(() {
@@ -305,8 +329,11 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
                     ),
                   );
                 },
-                child:
-                    const Icon(Icons.play_arrow, size: 50, color: Colors.white),
+                child: const Icon(
+                  Icons.play_arrow,
+                  size: 50,
+                  color: Colors.white,
+                ),
               ),
             ),
           ],
@@ -368,7 +395,8 @@ class _PomodoroScreenState extends State<PomodoroScreen>
     try {
       await _player.setAsset('assets/sounds/tick.wav');
       await _player.setClip(
-          end: Duration(milliseconds: (widget.audioDuration * 1000).toInt()));
+        end: Duration(milliseconds: (widget.audioDuration * 1000).toInt()),
+      );
     } catch (e) {
       // Log error silently
     }
@@ -443,16 +471,18 @@ class _PomodoroScreenState extends State<PomodoroScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             ...List.generate(
-                4,
-                (index) => TextField(
-                      decoration: InputDecoration(
-                          labelText: 'Section ${index + 1} (minutes)'),
-                      keyboardType: TextInputType.number,
-                      onChanged: (value) {
-                        sectionMinutes[index] =
-                            int.tryParse(value) ?? sectionMinutes[index];
-                      },
-                    )),
+              4,
+              (index) => TextField(
+                decoration: InputDecoration(
+                  labelText: 'Section ${index + 1} (minutes)',
+                ),
+                keyboardType: TextInputType.number,
+                onChanged: (value) {
+                  sectionMinutes[index] =
+                      int.tryParse(value) ?? sectionMinutes[index];
+                },
+              ),
+            ),
             if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
               CheckboxListTile(
                 title: const Text('Click-Through'),
@@ -580,67 +610,94 @@ class CircleTimerPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2 - 12;
+    final radius = size.width / 2 - 12; // Adjusted radius as per original
     final oval = Rect.fromCircle(center: center, radius: radius);
-
+  
+    // Draw flash effect if active
     if (flashOpacity > 0) {
       final flashPaint = Paint()
-        // ignore: deprecated_member_use
         ..color = Colors.white.withOpacity(flashOpacity)
         ..style = PaintingStyle.fill;
       canvas.drawCircle(center, radius + 12, flashPaint);
     }
-
-    double startAngle = 270;
-    double elapsedAngle = 360 * (1 - timeLeftInSeconds / totalTimeInSeconds);
-    bool isActive = true;
-
+  
+    // Calculate the total angle that has elapsed (from 12 o'clock, clockwise)
+    // This angle represents the portion of the circle that has passed.
+    final double elapsedAngleTotal = 360 * (1 - timeLeftInSeconds / totalTimeInSeconds);
+  
+    double currentAngle = 270; // Start at 12 o'clock (top)
+  
+    // 1. First, draw all sections with their SOLID (full opacity) color.
+    // This establishes the "time remaining" look for the entire circle.
     for (int i = 0; i < sections.length; i++) {
-      final sweepAngle = 360 * sections[i] / totalTimeInSeconds;
-      final paint = Paint()
+      final double sectionSweepAngle = 360 * sections[i] / totalTimeInSeconds;
+      // Determine the solid color for this section (workColor or restColor)
+      final Color solidColor = i % 2 == 0 ? workColor : restColor;
+  
+      final paintSolid = Paint()
         ..style = PaintingStyle.fill
-        ..color = i % 2 == 0
-            // ignore: deprecated_member_use
-            ? (isActive ? workColor : workColor.withOpacity(0.3))
-            // ignore: deprecated_member_use
-            : (isActive ? restColor : restColor.withOpacity(0.3));
-
-      if (isActive) {
-        canvas.drawArc(oval, startAngle * math.pi / 180,
-            sweepAngle * math.pi / 180, true, paint);
-        if (elapsedAngle > 0) {
-          final progressAngle = math.min(elapsedAngle, sweepAngle);
-          final progressPaint = Paint()
-            ..style = PaintingStyle.fill
-            // ignore: deprecated_member_use
-            ..color = i % 2 == 0
-                ? workColor.withOpacity(0.5)
-                : restColor.withOpacity(0.5);
-          canvas.drawArc(oval, startAngle * math.pi / 180,
-              progressAngle * math.pi / 180, true, progressPaint);
-          elapsedAngle -= progressAngle;
-          if (elapsedAngle <= 0) isActive = false;
-        }
-      } else {
-        canvas.drawArc(oval, startAngle * math.pi / 180,
-            sweepAngle * math.pi / 180, true, paint);
-      }
-      startAngle += sweepAngle;
+        ..color = solidColor;
+  
+      canvas.drawArc(
+        oval,
+        currentAngle * math.pi / 180,
+        sectionSweepAngle * math.pi / 180,
+        true,
+        paintSolid,
+      );
+      currentAngle += sectionSweepAngle;
     }
-
+  
+    // 2. Now, overlay the elapsed portion with the LIGHT (less opacity) color.
+    // Reset currentAngle to start from 12 o'clock again for drawing the elapsed part.
+    currentAngle = 270;
+    // This variable tracks how much of the total elapsed angle is left to draw.
+    double remainingElapsedAngleToDraw = elapsedAngleTotal; 
+  
+    for (int i = 0; i < sections.length; i++) {
+      final double sectionSweepAngle = 360 * sections[i] / totalTimeInSeconds;
+      // Determine the light/transparent color for this section
+      final Color lightColor = i % 2 == 0 ? workColor.withOpacity(0.3) : restColor.withOpacity(0.3);
+  
+      // Determine how much of this specific section is part of the elapsed time.
+      // It's the minimum of the remaining total elapsed angle and the current section's sweep angle.
+      final double elapsedInThisSection = math.min(remainingElapsedAngleToDraw, sectionSweepAngle);
+  
+      // Only draw if there's an elapsed portion in this section
+      if (elapsedInThisSection > 0) {
+        final paintLight = Paint()
+          ..style = PaintingStyle.fill
+          ..color = lightColor;
+  
+        canvas.drawArc(
+          oval,
+          currentAngle * math.pi / 180,
+          elapsedInThisSection * math.pi / 180,
+          true,
+          paintLight,
+        );
+        // Reduce the total elapsed angle that still needs to be drawn
+        remainingElapsedAngleToDraw -= elapsedInThisSection;
+      }
+      // Move to the start of the next section for the next iteration
+      currentAngle += sectionSweepAngle; 
+    }
+  
+    // Draw Zeiger (hand)
+    // The zeiger's angle is based on the total elapsed time
     final zeigerAngle =
         (360 * (1 - timeLeftInSeconds / totalTimeInSeconds) + 270) *
-            math.pi /
-            180;
+        math.pi /
+        180;
     final zeigerX = center.dx + radius * math.cos(zeigerAngle);
     final zeigerY = center.dy + radius * math.sin(zeigerAngle);
     final zeigerPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 4;
+      ..strokeWidth = 1; // Original stroke width
     canvas.drawLine(center, Offset(zeigerX, zeigerY), zeigerPaint);
-
-    const dotRadius = 12.0;
+  
+    const dotRadius = 3.0; // Original dot radius
     final extendedZeigerX =
         center.dx + (radius + dotRadius / 2) * math.cos(zeigerAngle);
     final extendedZeigerY =
@@ -649,7 +706,10 @@ class CircleTimerPainter extends CustomPainter {
       ..color = Colors.white
       ..style = PaintingStyle.fill;
     canvas.drawCircle(
-        Offset(extendedZeigerX, extendedZeigerY), dotRadius, dotPaint);
+      Offset(extendedZeigerX, extendedZeigerY),
+      dotRadius,
+      dotPaint,
+    );
   }
 
   @override
