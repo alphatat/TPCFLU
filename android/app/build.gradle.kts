@@ -1,44 +1,55 @@
-def localProperties = new Properties()
-def localPropertiesFile = rootProject.file('local.properties')
+import org.gradle.api.Project
+import org.gradle.api.tasks.Delete
+import org.gradle.kotlin.dsl.dependencies
+
+plugins {
+    id("com.android.application")
+    id("kotlin-android")
+    id("flutter")
+}
+
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
-    localPropertiesFile.withReader('UTF-8') { reader ->
+    localPropertiesFile.reader(Charsets.UTF_8).use { reader ->
         localProperties.load(reader)
     }
 }
 
-def flutterRoot = localProperties.getProperty('flutter.sdk')
+val flutterRoot: String? = localProperties.getProperty("flutter.sdk")
 if (flutterRoot == null) {
-    throw new GradleException("Flutter SDK not found. Define location with flutter.sdk in the local.properties file.")
+    throw GradleException("Flutter SDK not found. Define location with flutter.sdk in the local.properties file.")
 }
 
-apply plugin: 'com.android.application'
-apply plugin: 'kotlin-android'
-apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
-
 android {
-    compileSdkVersion 34
-    ndkVersion "27.0.12077973" // Added NDK version
+    compileSdk = 34
+    ndkVersion = "27.0.12077973"
+
     sourceSets {
-        main.java.srcDirs += 'src/main/kotlin'
+        getByName("main") {
+            java.srcDirs("src/main/kotlin")
+        }
     }
+
     defaultConfig {
-        applicationId "com.example.tpcflu"
-        minSdkVersion 21
-        targetSdkVersion 34
-        versionCode 1
-        versionName "1.0.0"
+        applicationId = "com.example.tpcflu"
+        minSdk = 21
+        targetSdk = 34
+        versionCode = 1
+        versionName = "1.0.0"
     }
+
     buildTypes {
-        release {
-            signingConfig signingConfigs.debug
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 }
 
 flutter {
-    source '../..'
+    source = file("$flutterRoot/..")
 }
 
 dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.10"
+    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.10")
 }
