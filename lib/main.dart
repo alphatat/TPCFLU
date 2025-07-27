@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:flutter_colorpicker.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:shared_preferences.dart/shared_preferences.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 import 'dart:io' show Platform;
 import 'dart:math' as math;
@@ -11,7 +11,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     await windowManager.ensureInitialized();
-    WindowOptions windowOptions = const WindowOptions(
+    const WindowOptions windowOptions = WindowOptions(
       size: Size(400, 400),
       center: true,
       alwaysOnTop: true,
@@ -37,7 +37,9 @@ class PomodoroApp extends StatelessWidget {
       title: 'TPCFLU',
       theme: ThemeData(
         primarySwatch: Colors.blue,
-        scaffoldBackgroundColor: kIsWeb || Platform.isAndroid || Platform.isIOS ? Colors.black : Colors.transparent,
+        scaffoldBackgroundColor: kIsWeb || Platform.isAndroid || Platform.isIOS
+            ? Colors.black
+            : Colors.transparent,
       ),
       home: const SettingsStartScreen(),
     );
@@ -48,6 +50,7 @@ class SettingsStartScreen extends StatefulWidget {
   const SettingsStartScreen({super.key});
 
   @override
+  // ignore: library_private_types_in_public_api
   _SettingsStartScreenState createState() => _SettingsStartScreenState();
 }
 
@@ -61,7 +64,7 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
   double windowSize = 400.0;
   Color workColor = Colors.red;
   Color restColor = Colors.cyan;
-  double audioDuration = 1.0; // Seconds
+  double audioDuration = 1.0;
 
   @override
   void initState() {
@@ -72,7 +75,8 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
   Future<void> _loadPreferences() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      sectionMinutes = List.generate(4, (i) => prefs.getInt('section_$i') ?? [18, 12, 18, 12][i]);
+      sectionMinutes = List.generate(
+          4, (i) => prefs.getInt('section_$i') ?? [18, 12, 18, 12][i]);
       isSoundEnabled = prefs.getBool('sound_enabled') ?? true;
       isVibrationEnabled = prefs.getBool('vibration_enabled') ?? true;
       isClickThroughEnabled = prefs.getBool('click_through_enabled') ?? false;
@@ -113,7 +117,7 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
       builder: (context) => AlertDialog(
         title: Text(isWorkColor ? 'Select Work Color' : 'Select Rest Color'),
         content: SingleChildScrollView(
-          child: ColorPicker(
+          child: BlockPicker(
             pickerColor: isWorkColor ? workColor : restColor,
             onColorChanged: (color) {
               setState(() {
@@ -147,22 +151,28 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Timer Sections (minutes)', style: TextStyle(color: Colors.white, fontSize: 18)),
-            ...List.generate(4, (index) => TextField(
-              decoration: InputDecoration(
-                labelText: 'Section ${index + 1}',
-                labelStyle: const TextStyle(color: Colors.white70),
-                enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white70)),
-              ),
-              style: const TextStyle(color: Colors.white),
-              keyboardType: TextInputType.number,
-              onChanged: (value) {
-                sectionMinutes[index] = int.tryParse(value) ?? sectionMinutes[index];
-              },
-            )),
+            const Text('Timer Sections (minutes)',
+                style: TextStyle(color: Colors.white, fontSize: 18)),
+            ...List.generate(
+                4,
+                (index) => TextField(
+                      decoration: InputDecoration(
+                        labelText: 'Section ${index + 1}',
+                        labelStyle: const TextStyle(color: Colors.white70),
+                        enabledBorder: const UnderlineInputBorder(
+                            borderSide: BorderSide(color: Colors.white70)),
+                      ),
+                      style: const TextStyle(color: Colors.white),
+                      keyboardType: TextInputType.number,
+                      onChanged: (value) {
+                        sectionMinutes[index] =
+                            int.tryParse(value) ?? sectionMinutes[index];
+                      },
+                    )),
             const SizedBox(height: 20),
             SwitchListTile(
-              title: const Text('Sound Enabled', style: TextStyle(color: Colors.white)),
+              title: const Text('Sound Enabled',
+                  style: TextStyle(color: Colors.white)),
               value: isSoundEnabled,
               onChanged: (value) {
                 setState(() {
@@ -172,7 +182,8 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
               },
             ),
             SwitchListTile(
-              title: const Text('Vibration/Flash Enabled', style: TextStyle(color: Colors.white)),
+              title: const Text('Vibration/Flash Enabled',
+                  style: TextStyle(color: Colors.white)),
               value: isVibrationEnabled,
               onChanged: (value) {
                 setState(() {
@@ -183,17 +194,20 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
             ),
             const SizedBox(height: 20),
             ListTile(
-              title: const Text('Work Color', style: TextStyle(color: Colors.white)),
+              title: const Text('Work Color',
+                  style: TextStyle(color: Colors.white)),
               trailing: Container(width: 30, height: 30, color: workColor),
               onTap: () => _selectColor(context, true),
             ),
             ListTile(
-              title: const Text('Rest Color', style: TextStyle(color: Colors.white)),
+              title: const Text('Rest Color',
+                  style: TextStyle(color: Colors.white)),
               trailing: Container(width: 30, height: 30, color: restColor),
               onTap: () => _selectColor(context, false),
             ),
             const SizedBox(height: 20),
-            const Text('Audio Duration (seconds)', style: TextStyle(color: Colors.white, fontSize: 18)),
+            const Text('Audio Duration (seconds)',
+                style: TextStyle(color: Colors.white, fontSize: 18)),
             Slider(
               value: audioDuration,
               min: 0.5,
@@ -209,8 +223,10 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
             ),
             if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) ...[
               const SizedBox(height: 20),
-              const Text('Desktop Settings', style: TextStyle(color: Colors.white, fontSize: 18)),
-              const Text('Window Opacity', style: TextStyle(color: Colors.white)),
+              const Text('Desktop Settings',
+                  style: TextStyle(color: Colors.white, fontSize: 18)),
+              const Text('Window Opacity',
+                  style: TextStyle(color: Colors.white)),
               Slider(
                 value: opacity,
                 min: 0.1,
@@ -241,7 +257,8 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
                 },
               ),
               SwitchListTile(
-                title: const Text('Click-Through', style: TextStyle(color: Colors.white)),
+                title: const Text('Click-Through',
+                    style: TextStyle(color: Colors.white)),
                 value: isClickThroughEnabled,
                 onChanged: (value) {
                   setState(() {
@@ -252,7 +269,8 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
                 },
               ),
               SwitchListTile(
-                title: const Text('Draggable', style: TextStyle(color: Colors.white)),
+                title: const Text('Draggable',
+                    style: TextStyle(color: Colors.white)),
                 value: isDraggable,
                 onChanged: (value) {
                   setState(() {
@@ -287,7 +305,8 @@ class _SettingsStartScreenState extends State<SettingsStartScreen> {
                     ),
                   );
                 },
-                child: const Icon(Icons.play_arrow, size: 50, color: Colors.white),
+                child:
+                    const Icon(Icons.play_arrow, size: 50, color: Colors.white),
               ),
             ),
           ],
@@ -318,10 +337,12 @@ class PomodoroScreen extends StatefulWidget {
   });
 
   @override
+  // ignore: library_private_types_in_public_api
   _PomodoroScreenState createState() => _PomodoroScreenState();
 }
 
-class _PomodoroScreenState extends State<PomodoroScreen> with TickerProviderStateMixin {
+class _PomodoroScreenState extends State<PomodoroScreen>
+    with TickerProviderStateMixin {
   final AudioPlayer _player = AudioPlayer();
   int currentSection = 0;
   late int timeLeftInSeconds;
@@ -339,16 +360,17 @@ class _PomodoroScreenState extends State<PomodoroScreen> with TickerProviderStat
       duration: const Duration(milliseconds: 200),
     );
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      windowManager.setIgnoreMouseEvents(widget.isClickThroughEnabled);
+      windowManager.setMovable(widget.isClickThroughEnabled);
     }
   }
 
   Future<void> _loadAudio() async {
     try {
       await _player.setAsset('assets/sounds/tick.wav');
-      await _player.setClip(end: Duration(milliseconds: (widget.audioDuration * 1000).toInt()));
+      await _player.setClip(
+          end: Duration(milliseconds: (widget.audioDuration * 1000).toInt()));
     } catch (e) {
-      print('Error loading audio: $e');
+      // Log error silently
     }
   }
 
@@ -420,13 +442,17 @@ class _PomodoroScreenState extends State<PomodoroScreen> with TickerProviderStat
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ...List.generate(4, (index) => TextField(
-              decoration: InputDecoration(labelText: 'Section ${index + 1} (minutes)'),
-              keyboardType: TextInputType.number,
-              onChanged: (value) {
-                sectionMinutes[index] = int.tryParse(value) ?? sectionMinutes[index];
-              },
-            )),
+            ...List.generate(
+                4,
+                (index) => TextField(
+                      decoration: InputDecoration(
+                          labelText: 'Section ${index + 1} (minutes)'),
+                      keyboardType: TextInputType.number,
+                      onChanged: (value) {
+                        sectionMinutes[index] =
+                            int.tryParse(value) ?? sectionMinutes[index];
+                      },
+                    )),
             if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
               CheckboxListTile(
                 title: const Text('Click-Through'),
@@ -447,7 +473,6 @@ class _PomodoroScreenState extends State<PomodoroScreen> with TickerProviderStat
           TextButton(
             onPressed: () {
               setState(() {
-                // Update sections and reset timer
                 widget.sections.clear();
                 widget.sections.addAll(sectionMinutes.map((m) => m * 60));
                 timeLeftInSeconds = widget.sections.reduce((a, b) => a + b);
@@ -462,6 +487,7 @@ class _PomodoroScreenState extends State<PomodoroScreen> with TickerProviderStat
                 for (int i = 0; i < 4; i++) {
                   prefs.setInt('section_$i', sectionMinutes[i]);
                 }
+                ;
               });
             },
             child: const Text('Save'),
@@ -469,17 +495,6 @@ class _PomodoroScreenState extends State<PomodoroScreen> with TickerProviderStat
         ],
       ),
     );
-  }
-
-  void _showBackButton() {
-    setState(() {
-      showBackButton = true;
-    });
-    Future.delayed(const Duration(milliseconds: 1727), () {
-      setState(() {
-        showBackButton = false;
-      });
-    });
   }
 
   void _resetAndGoBack() {
@@ -571,6 +586,7 @@ class CircleTimerPainter extends CustomPainter {
 
     if (flashOpacity > 0) {
       final flashPaint = Paint()
+        // ignore: deprecated_member_use
         ..color = Colors.white.withOpacity(flashOpacity)
         ..style = PaintingStyle.fill;
       canvas.drawCircle(center, radius + 12, flashPaint);
@@ -585,27 +601,38 @@ class CircleTimerPainter extends CustomPainter {
       final paint = Paint()
         ..style = PaintingStyle.fill
         ..color = i % 2 == 0
+            // ignore: deprecated_member_use
             ? (isActive ? workColor : workColor.withOpacity(0.3))
+            // ignore: deprecated_member_use
             : (isActive ? restColor : restColor.withOpacity(0.3));
 
       if (isActive) {
-        canvas.drawArc(oval, startAngle * math.pi / 180, sweepAngle * math.pi / 180, true, paint);
+        canvas.drawArc(oval, startAngle * math.pi / 180,
+            sweepAngle * math.pi / 180, true, paint);
         if (elapsedAngle > 0) {
           final progressAngle = math.min(elapsedAngle, sweepAngle);
           final progressPaint = Paint()
             ..style = PaintingStyle.fill
-            ..color = i % 2 == 0 ? workColor.withOpacity(0.5) : restColor.withOpa
-          canvas.drawArc(oval, startAngle * math.pi / 180, progressAngle * math.pi / 180, true, progressPaint);
+            // ignore: deprecated_member_use
+            ..color = i % 2 == 0
+                ? workColor.withOpacity(0.5)
+                : restColor.withOpacity(0.5);
+          canvas.drawArc(oval, startAngle * math.pi / 180,
+              progressAngle * math.pi / 180, true, progressPaint);
           elapsedAngle -= progressAngle;
           if (elapsedAngle <= 0) isActive = false;
         }
       } else {
-        canvas.drawArc(oval, startAngle * math.pi / 180, sweepAngle * math.pi / 180, true, paint);
+        canvas.drawArc(oval, startAngle * math.pi / 180,
+            sweepAngle * math.pi / 180, true, paint);
       }
       startAngle += sweepAngle;
     }
 
-    final zeigerAngle = (360 * (1 - timeLeftInSeconds / totalTimeInSeconds) + 270) * math.pi / 180;
+    final zeigerAngle =
+        (360 * (1 - timeLeftInSeconds / totalTimeInSeconds) + 270) *
+            math.pi /
+            180;
     final zeigerX = center.dx + radius * math.cos(zeigerAngle);
     final zeigerY = center.dy + radius * math.sin(zeigerAngle);
     final zeigerPaint = Paint()
@@ -614,13 +641,16 @@ class CircleTimerPainter extends CustomPainter {
       ..strokeWidth = 4;
     canvas.drawLine(center, Offset(zeigerX, zeigerY), zeigerPaint);
 
-    final dotRadius = 12.0;
-    final extendedZeigerX = center.dx + (radius + dotRadius / 2) * math.cos(zeigerAngle);
-    final extendedZeigerY = center.dy + (radius + dotRadius / 2) * math.sin(zeigerAngle);
+    const dotRadius = 12.0;
+    final extendedZeigerX =
+        center.dx + (radius + dotRadius / 2) * math.cos(zeigerAngle);
+    final extendedZeigerY =
+        center.dy + (radius + dotRadius / 2) * math.sin(zeigerAngle);
     final dotPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.fill;
-    canvas.drawCircle(Offset(extendedZeigerX, extendedZeigerY), dotRadius, dotPaint);
+    canvas.drawCircle(
+        Offset(extendedZeigerX, extendedZeigerY), dotRadius, dotPaint);
   }
 
   @override
