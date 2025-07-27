@@ -487,7 +487,6 @@ class _PomodoroScreenState extends State<PomodoroScreen>
                 for (int i = 0; i < 4; i++) {
                   prefs.setInt('section_$i', sectionMinutes[i]);
                 }
-                ;
               });
             },
             child: const Text('Save'),
