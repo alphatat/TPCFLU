@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart' as window_manager;
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -35,8 +34,8 @@ class PomodoroSettings with ChangeNotifier {
     isDraggable = prefs.getBool('draggable_enabled') ?? true;
     opacity = prefs.getDouble('opacity') ?? 0.8;
     windowSize = prefs.getDouble('window_size') ?? 400.0;
-    workColor = Color(prefs.getInt('work_color') ?? Colors.red.toARGB32());
-    restColor = Color(prefs.getInt('rest_color') ?? Colors.cyan.toARGB32());
+    workColor = Color(prefs.getInt('work_color') ?? Colors.red.value);
+    restColor = Color(prefs.getInt('rest_color') ?? Colors.cyan.value);
     audioDuration = prefs.getDouble('audio_duration') ?? 1.0;
     notifyListeners();
   }
@@ -52,8 +51,8 @@ class PomodoroSettings with ChangeNotifier {
     await prefs.setBool('draggable_enabled', isDraggable);
     await prefs.setDouble('opacity', opacity);
     await prefs.setDouble('window_size', windowSize);
-    await prefs.setInt('work_color', workColor.toARGB32());
-    await prefs.setInt('rest_color', restColor.toARGB32());
+    await prefs.setInt('work_color', workColor.value);
+    await prefs.setInt('rest_color', restColor.value);
     await prefs.setDouble('audio_duration', audioDuration);
     notifyListeners();
   }
@@ -110,29 +109,18 @@ class PomodoroSettings with ChangeNotifier {
 }
 
 void main() async {
-  if (Platform.isWindows) {
-    JustAudioMediaKit.ensureInitialized(
-      windows: true,
-    );
-  }
-  if (Platform.isLinux) {
-    JustAudioMediaKit.ensureInitialized(
-      linux: true,
-    );
-  }
-
+  WidgetsFlutterBinding.ensureInitialized();
   if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
     try {
       await window_manager.WindowManager.instance.ensureInitialized();
-
       const window_manager.WindowOptions windowOptions =
           window_manager.WindowOptions(
-        size: Size(400, 400),
-        center: true,
-        alwaysOnTop: true,
-        backgroundColor: Colors.transparent,
-        skipTaskbar: false,
-      );
+            size: Size(400, 400),
+            center: true,
+            alwaysOnTop: true,
+            backgroundColor: Colors.transparent,
+            skipTaskbar: false,
+          );
       await window_manager.WindowManager.instance.waitUntilReadyToShow(
         windowOptions,
         () async {
@@ -373,7 +361,7 @@ class PomodoroScreen extends StatefulWidget {
   const PomodoroScreen({super.key, required this.settings});
 
   @override
-  State<PomodoroScreen> createState() => _PomodoroScreenState();
+  _PomodoroScreenState createState() => _PomodoroScreenState();
 }
 
 class _PomodoroScreenState extends State<PomodoroScreen>
@@ -600,8 +588,8 @@ class _PomodoroScreenState extends State<PomodoroScreen>
           ),
           TextButton(
             onPressed: () {
-              widget.settings.sectionMinutes =
-                  localSettings.sectionMinutes.toList();
+              widget.settings.sectionMinutes = localSettings.sectionMinutes
+                  .toList();
               widget.settings.updateClickThrough(
                 localSettings.isClickThroughEnabled,
               );
@@ -683,7 +671,7 @@ class _PomodoroScreenState extends State<PomodoroScreen>
                     timeLeftInSeconds: timeLeftInSeconds,
                     totalTimeInSeconds:
                         widget.settings.sectionMinutes.reduce((a, b) => a + b) *
-                            60,
+                        60,
                     sections: widget.settings.sectionMinutes,
                     currentSection: currentSection,
                     flashOpacity: _flashController.value,
@@ -698,7 +686,8 @@ class _PomodoroScreenState extends State<PomodoroScreen>
             top: 20,
             left: 20,
             child: IgnorePointer(
-              ignoring: widget.settings.isClickThroughEnabled &&
+              ignoring:
+                  widget.settings.isClickThroughEnabled &&
                   !_isBackButtonHovered,
               child: AnimatedOpacity(
                 opacity: _isBackButtonHovered ? 1.0 : 0.3,
@@ -780,7 +769,7 @@ class CircleTimerPainter extends CustomPainter {
 
     if (flashOpacity > 0) {
       final flashPaint = Paint()
-        ..color = Colors.white.withAlpha((flashOpacity * 255).toInt())
+        ..color = Colors.white.withOpacity(flashOpacity)
         ..style = PaintingStyle.fill;
       canvas.drawCircle(center, radius + 12, flashPaint);
     }
@@ -793,8 +782,9 @@ class CircleTimerPainter extends CustomPainter {
       final sectionSweepDegrees =
           (sectionDurationSeconds / totalTimeInSeconds) * 360;
       final solidColor = i % 2 == 0 ? workColor : restColor;
-      final lightColor =
-          i % 2 == 0 ? workColor.withAlpha(76) : restColor.withAlpha(76);
+      final lightColor = i % 2 == 0
+          ? workColor.withOpacity(0.3)
+          : restColor.withOpacity(0.3);
       final secondsElapsedSoFar = totalTimeInSeconds - timeLeftInSeconds;
 
       if (secondsElapsedSoFar >=
@@ -814,7 +804,7 @@ class CircleTimerPainter extends CustomPainter {
             secondsElapsedSoFar - cumulativeSecondsPassed;
         final elapsedPartSweepDegrees =
             (elapsedInCurrentSection / sectionDurationSeconds) *
-                sectionSweepDegrees;
+            sectionSweepDegrees;
         if (elapsedPartSweepDegrees > 0) {
           final paintLight = Paint()
             ..style = PaintingStyle.fill
