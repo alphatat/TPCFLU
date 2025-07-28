@@ -168,7 +168,7 @@ class PomodoroApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         scaffoldBackgroundColor: kIsWeb || Platform.isAndroid || Platform.isIOS
             ? Colors.black
-            : Colors.white,
+            : Colors.transparent,
         textTheme: const TextTheme(
           displayLarge: TextStyle(color: Colors.white),
           displayMedium: TextStyle(color: Colors.white),
