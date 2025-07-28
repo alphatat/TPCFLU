@@ -21,8 +21,8 @@ class PomodoroSettings with ChangeNotifier {
   Color restColor = Colors.cyan;
   double audioDuration = 1.0;
   bool isClickThroughEnabled = false; // Kept, but its behavior is modified
-  int windowX = 0; // New: X-coordinate (0-100)
-  int windowY = 100; // New: Y-coordinate (0-100, 100 is top)
+  int windowX = 0; // New: X-coordinate (0-100) - NOTE: Not fully functional without getPrimaryDisplay()
+  int windowY = 100; // New: Y-coordinate (0-100, 100 is top) - NOTE: Not fully functional without getPrimaryDisplay()
 
   Future<void> loadPreferences() async {
     final prefs = await SharedPreferences.getInstance();
@@ -162,7 +162,6 @@ class PomodoroApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'TPCFLU',
-      // Start of Text Color Fix
       theme: ThemeData(
         brightness: Brightness.dark, // Set brightness to dark for better defaults
         primarySwatch: Colors.blue,
@@ -248,7 +247,6 @@ class PomodoroApp extends StatelessWidget {
           iconColor: Colors.white, // Ensure icons in ListTiles are white
         ),
       ),
-      // End of Text Color Fix
       home: const SettingsStartScreen(),
     );
   }
@@ -406,8 +404,8 @@ class SettingsStartScreen extends StatelessWidget {
                   settings.savePreferences();
                 },
               ),
-              // New: Window Position Sliders
-              const Text('Window X Position (0-100)'),
+              // Window Position Sliders - NOTE: These will not have an effect without window_manager >= 0.5.2
+              const Text('Window X Position (0-100) - No effect on this version'),
               Slider(
                 value: settings.windowX.toDouble(),
                 min: 0,
@@ -419,7 +417,7 @@ class SettingsStartScreen extends StatelessWidget {
                 },
                 onChangeEnd: (_) => settings.savePreferences(),
               ),
-              const Text('Window Y Position (0-100)'),
+              const Text('Window Y Position (0-100) - No effect on this version'),
               Slider(
                 value: settings.windowY.toDouble(),
                 min: 0,
@@ -493,18 +491,16 @@ class _PomodoroScreenState extends State<PomodoroScreen>
       vsync: this,
       duration: const Duration(milliseconds: 200),
     );
-    // _loadAudio(); // Initial load not strictly needed here if re-setting every time
     _applyDesktopSettings(); // Apply settings on screen entry
 
     // Start the timer automatically when entering the screen
     _startTimer();
   }
 
-  // Changed to async to allow await calls inside
   Future<void> _loadAudio() async {
+    // This method is now effectively a placeholder as audio is prepared on demand in _playTransitionEffects
     try {
-      // We are moving the setAsset and setClip to _playTransitionEffects
-      // This method now serves more as a placeholder if you needed pre-loading logic.
+      // You can add pre-loading logic here if needed for very quick, repeated sounds
     } catch (e) {
       debugPrint('Audio load error: $e');
     }
@@ -525,31 +521,12 @@ class _PomodoroScreenState extends State<PomodoroScreen>
           widget.settings.isClickThroughEnabled,
         );
 
-        final display = await window_manager.WindowManager.instance.getPrimaryDisplay();
-        if (display != null) {
-          final double screenWidth = display.size.width;
-          final double screenHeight = display.size.height;
-          final double windowWidth = widget.settings.windowSize;
-          final double windowHeight = widget.settings.windowSize;
+        // Removed the getPrimaryDisplay() call and position calculations
+        // as this method is not available in window_manager 0.5.1
+        // The window will default to center based on initial windowOptions in main()
+        // and only size/opacity/click-through will be applied from settings here.
+        debugPrint('Window X/Y positioning not applied (window_manager < 0.5.2)');
 
-          // Calculate pixel coordinates based on 0-100 percentage
-          // X: 0 = left edge, 100 = right edge
-          // Y: 0 = bottom edge, 100 = top edge
-          final double targetX = (screenWidth * widget.settings.windowX / 100);
-          final double targetY = (screenHeight * (100 - widget.settings.windowY) / 100);
-
-          // Adjust for window center if you want 0,0 to be top-left of window, not center of window
-          final double finalX = targetX - (windowWidth / 2);
-          final double finalY = targetY - (windowHeight / 2);
-
-          // Clamp target position to ensure window stays on screen
-          final double clampedX = finalX.clamp(0.0, screenWidth - windowWidth);
-          final double clampedY = finalY.clamp(0.0, screenHeight - windowHeight);
-
-          await window_manager.WindowManager.instance.setPosition(
-            Offset(clampedX, clampedY),
-          );
-        }
       } catch (e) {
         debugPrint('Desktop settings error: $e');
       }
