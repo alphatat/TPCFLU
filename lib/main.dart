@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:just_audio_media_kit/just_audio_media_kit.dart'; // Keep this for desktop audio backend
+import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart' as window_manager;
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -15,13 +15,14 @@ class PomodoroSettings with ChangeNotifier {
   List<int> sectionMinutes = [18, 12, 18, 12];
   bool isSoundEnabled = true;
   bool isVibrationEnabled = true;
-  bool isClickThroughEnabled = false;
-  bool isDraggable = true;
   double opacity = 0.8;
   double windowSize = 400.0;
   Color workColor = Colors.red;
   Color restColor = Colors.cyan;
   double audioDuration = 1.0;
+  bool isClickThroughEnabled = false; // Kept, but its behavior is modified
+  int windowX = 0; // New: X-coordinate (0-100)
+  int windowY = 100; // New: Y-coordinate (0-100, 100 is top)
 
   Future<void> loadPreferences() async {
     final prefs = await SharedPreferences.getInstance();
@@ -32,12 +33,13 @@ class PomodoroSettings with ChangeNotifier {
     isSoundEnabled = prefs.getBool('sound_enabled') ?? true;
     isVibrationEnabled = prefs.getBool('vibration_enabled') ?? true;
     isClickThroughEnabled = prefs.getBool('click_through_enabled') ?? false;
-    isDraggable = prefs.getBool('draggable_enabled') ?? true;
     opacity = prefs.getDouble('opacity') ?? 0.8;
     windowSize = prefs.getDouble('window_size') ?? 400.0;
     workColor = Color(prefs.getInt('work_color') ?? Colors.red.value);
     restColor = Color(prefs.getInt('rest_color') ?? Colors.cyan.value);
     audioDuration = prefs.getDouble('audio_duration') ?? 1.0;
+    windowX = prefs.getInt('window_x') ?? 0; // Load new preference
+    windowY = prefs.getInt('window_y') ?? 100; // Load new preference (default top)
     notifyListeners();
   }
 
@@ -49,12 +51,13 @@ class PomodoroSettings with ChangeNotifier {
     await prefs.setBool('sound_enabled', isSoundEnabled);
     await prefs.setBool('vibration_enabled', isVibrationEnabled);
     await prefs.setBool('click_through_enabled', isClickThroughEnabled);
-    await prefs.setBool('draggable_enabled', isDraggable);
     await prefs.setDouble('opacity', opacity);
     await prefs.setDouble('window_size', windowSize);
     await prefs.setInt('work_color', workColor.value);
     await prefs.setInt('rest_color', restColor.value);
     await prefs.setDouble('audio_duration', audioDuration);
+    await prefs.setInt('window_x', windowX); // Save new preference
+    await prefs.setInt('window_y', windowY); // Save new preference
     notifyListeners();
   }
 
@@ -75,11 +78,6 @@ class PomodoroSettings with ChangeNotifier {
 
   void updateClickThrough(bool value) {
     isClickThroughEnabled = value;
-    notifyListeners();
-  }
-
-  void updateDraggable(bool value) {
-    isDraggable = value;
     notifyListeners();
   }
 
@@ -107,6 +105,16 @@ class PomodoroSettings with ChangeNotifier {
     audioDuration = value;
     notifyListeners();
   }
+
+  void updateWindowX(int value) {
+    windowX = value.clamp(0, 100); // Clamp value between 0 and 100
+    notifyListeners();
+  }
+
+  void updateWindowY(int value) {
+    windowY = value.clamp(0, 100); // Clamp value between 0 and 100
+    notifyListeners();
+  }
 }
 
 void main() async {
@@ -114,16 +122,17 @@ void main() async {
 
   // Initialize JustAudioMediaKit backend for desktop platforms
   if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
-    JustAudioMediaKit.ensureInitialized(); // No need for windows: true or linux: true, it handles it
+    JustAudioMediaKit.ensureInitialized();
   }
 
   if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
     try {
       await window_manager.WindowManager.instance.ensureInitialized();
+      // Initial window options
       const window_manager.WindowOptions windowOptions =
           window_manager.WindowOptions(
             size: Size(400, 400),
-            center: true,
+            center: true, // Initially center
             alwaysOnTop: true,
             backgroundColor: Colors.transparent,
             skipTaskbar: false,
@@ -153,17 +162,93 @@ class PomodoroApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'TPCFLU',
+      // Start of Text Color Fix
       theme: ThemeData(
+        brightness: Brightness.dark, // Set brightness to dark for better defaults
         primarySwatch: Colors.blue,
         scaffoldBackgroundColor: kIsWeb || Platform.isAndroid || Platform.isIOS
             ? Colors.black
             : Colors.white,
         textTheme: const TextTheme(
+          displayLarge: TextStyle(color: Colors.white),
+          displayMedium: TextStyle(color: Colors.white),
+          displaySmall: TextStyle(color: Colors.white),
+          headlineLarge: TextStyle(color: Colors.white),
+          headlineMedium: TextStyle(color: Colors.white),
+          headlineSmall: TextStyle(color: Colors.white),
+          titleLarge: TextStyle(color: Colors.white),
+          titleMedium: TextStyle(color: Colors.white),
+          titleSmall: TextStyle(color: Colors.white),
+          bodyLarge: TextStyle(color: Colors.white),
           bodyMedium: TextStyle(color: Colors.white),
-          titleLarge: TextStyle(color: Colors.white, fontSize: 18),
-          labelMedium: TextStyle(color: Colors.white70),
+          bodySmall: TextStyle(color: Colors.white),
+          labelLarge: TextStyle(color: Colors.white),
+          labelMedium: TextStyle(color: Colors.white70), // Keep 70% opacity for labels if desired
+          labelSmall: TextStyle(color: Colors.white),
+        ),
+        colorScheme: const ColorScheme.dark(
+          primary: Colors.red, // Primary color for some interactive elements
+          onPrimary: Colors.white, // Text color on primary background
+          secondary: Colors.cyan, // Secondary color
+          onSecondary: Colors.white, // Text color on secondary background
+          surface: Colors.black, // Surface color for cards, dialogs
+          onSurface: Colors.white, // Text color on surface
+          background: Colors.black, // Background color
+          onBackground: Colors.white, // Text color on background
+          error: Colors.red, // Error color
+          onError: Colors.white, // Text color on error
+        ),
+        inputDecorationTheme: const InputDecorationTheme(
+          labelStyle: TextStyle(color: Colors.white),
+          hintStyle: TextStyle(color: Colors.white70),
+          prefixStyle: TextStyle(color: Colors.white),
+          suffixStyle: TextStyle(color: Colors.white),
+          helperStyle: TextStyle(color: Colors.white70),
+          counterStyle: TextStyle(color: Colors.white70),
+          errorStyle: TextStyle(color: Colors.redAccent),
+          filled: true,
+          fillColor: Colors.white10, // A subtle fill for text fields
+          enabledBorder: UnderlineInputBorder(
+            borderSide: BorderSide(color: Colors.white70),
+          ),
+          focusedBorder: UnderlineInputBorder(
+            borderSide: BorderSide(color: Colors.white),
+          ),
+          errorBorder: UnderlineInputBorder(
+            borderSide: BorderSide(color: Colors.red),
+          ),
+          focusedErrorBorder: UnderlineInputBorder(
+            borderSide: BorderSide(color: Colors.redAccent),
+          ),
+        ),
+        sliderTheme: const SliderThemeData(
+          overlayColor: Colors.white24, // Color when long-pressed
+          thumbColor: Colors.white,
+          activeTrackColor: Colors.white,
+          inactiveTrackColor: Colors.white54,
+          valueIndicatorColor: Colors.white, // For the label that pops up
+          valueIndicatorTextStyle: TextStyle(color: Colors.black), // Text on the value indicator
+        ),
+        switchTheme: SwitchThemeData(
+          thumbColor: MaterialStateProperty.resolveWith((states) {
+            if (states.contains(MaterialState.selected)) {
+              return Colors.white; // Thumb color when ON
+            }
+            return Colors.white; // Thumb color when OFF
+          }),
+          trackColor: MaterialStateProperty.resolveWith((states) {
+            if (states.contains(MaterialState.selected)) {
+              return Colors.green; // Track color when ON
+            }
+            return Colors.grey; // Track color when OFF
+          }),
+        ),
+        listTileTheme: const ListTileThemeData(
+          textColor: Colors.white, // Ensure text in ListTiles is white
+          iconColor: Colors.white, // Ensure icons in ListTiles are white
         ),
       ),
+      // End of Text Color Fix
       home: const SettingsStartScreen(),
     );
   }
@@ -180,7 +265,7 @@ class SettingsStartScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(isWorkColor ? 'Select Work Color' : 'Select Rest Color'),
+        title: Text(isWorkColor ? 'Select Work Color' : 'Select Rest Color'), // Now inherits from theme
         content: SingleChildScrollView(
           child: BlockPicker(
             pickerColor: isWorkColor ? settings.workColor : settings.restColor,
@@ -199,7 +284,7 @@ class SettingsStartScreen extends StatelessWidget {
               Navigator.pop(context);
               settings.savePreferences();
             },
-            child: const Text('OK'),
+            child: const Text('OK'), // Now inherits from theme
           ),
         ],
       ),
@@ -219,10 +304,8 @@ class SettingsStartScreen extends StatelessWidget {
             ...List.generate(
               4,
               (index) => TextField(
-                decoration: const InputDecoration(
-                  enabledBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white70),
-                  ),
+                decoration: InputDecoration(
+                  labelText: 'Section ${index + 1} (minutes)',
                 ),
                 keyboardType: TextInputType.number,
                 controller: TextEditingController(
@@ -323,13 +406,30 @@ class SettingsStartScreen extends StatelessWidget {
                   settings.savePreferences();
                 },
               ),
-              SwitchListTile(
-                title: const Text('Draggable'),
-                value: settings.isDraggable,
+              // New: Window Position Sliders
+              const Text('Window X Position (0-100)'),
+              Slider(
+                value: settings.windowX.toDouble(),
+                min: 0,
+                max: 100,
+                divisions: 100,
+                label: settings.windowX.toString(),
                 onChanged: (value) {
-                  settings.updateDraggable(value);
-                  settings.savePreferences();
+                  settings.updateWindowX(value.toInt());
                 },
+                onChangeEnd: (_) => settings.savePreferences(),
+              ),
+              const Text('Window Y Position (0-100)'),
+              Slider(
+                value: settings.windowY.toDouble(),
+                min: 0,
+                max: 100,
+                divisions: 100,
+                label: settings.windowY.toString(),
+                onChanged: (value) {
+                  settings.updateWindowY(value.toInt());
+                },
+                onChangeEnd: (_) => settings.savePreferences(),
               ),
             ],
             const SizedBox(height: 20),
@@ -376,11 +476,11 @@ class _PomodoroScreenState extends State<PomodoroScreen>
   final AudioPlayer _player = AudioPlayer();
   int currentSection = 0;
   late int timeLeftInSeconds;
-  bool isRunning = false; // This now just indicates if the timer is *active* after initial start
+  bool isRunning = false;
   late AnimationController _flashController;
   Timer? _timer;
 
-  // NEW: Variables for central back button visibility
+  // Variables for central back button visibility
   Timer? _centralButtonVisibilityTimer;
   bool _isCentralButtonVisible = false;
 
@@ -393,22 +493,18 @@ class _PomodoroScreenState extends State<PomodoroScreen>
       vsync: this,
       duration: const Duration(milliseconds: 200),
     );
-    _loadAudio();
-    _applyDesktopSettings();
+    // _loadAudio(); // Initial load not strictly needed here if re-setting every time
+    _applyDesktopSettings(); // Apply settings on screen entry
 
     // Start the timer automatically when entering the screen
     _startTimer();
   }
 
+  // Changed to async to allow await calls inside
   Future<void> _loadAudio() async {
     try {
-      await _player.setAsset('assets/sounds/tick.wav');
-      await _player.setClip(
-        end: Duration(
-          milliseconds: (widget.settings.audioDuration * 1000).toInt(),
-        ),
-      );
-      await _player.load(); // Preload to reduce latency
+      // We are moving the setAsset and setClip to _playTransitionEffects
+      // This method now serves more as a placeholder if you needed pre-loading logic.
     } catch (e) {
       debugPrint('Audio load error: $e');
     }
@@ -424,38 +520,59 @@ class _PomodoroScreenState extends State<PomodoroScreen>
         await window_manager.WindowManager.instance.setSize(
           Size(widget.settings.windowSize, widget.settings.windowSize),
         );
-        await window_manager.WindowManager.instance.setMovable(
-          widget.settings.isDraggable,
-        );
+
         await window_manager.WindowManager.instance.setIgnoreMouseEvents(
           widget.settings.isClickThroughEnabled,
         );
+
+        final display = await window_manager.WindowManager.instance.getPrimaryDisplay();
+        if (display != null) {
+          final double screenWidth = display.size.width;
+          final double screenHeight = display.size.height;
+          final double windowWidth = widget.settings.windowSize;
+          final double windowHeight = widget.settings.windowSize;
+
+          // Calculate pixel coordinates based on 0-100 percentage
+          // X: 0 = left edge, 100 = right edge
+          // Y: 0 = bottom edge, 100 = top edge
+          final double targetX = (screenWidth * widget.settings.windowX / 100);
+          final double targetY = (screenHeight * (100 - widget.settings.windowY) / 100);
+
+          // Adjust for window center if you want 0,0 to be top-left of window, not center of window
+          final double finalX = targetX - (windowWidth / 2);
+          final double finalY = targetY - (windowHeight / 2);
+
+          // Clamp target position to ensure window stays on screen
+          final double clampedX = finalX.clamp(0.0, screenWidth - windowWidth);
+          final double clampedY = finalY.clamp(0.0, screenHeight - windowHeight);
+
+          await window_manager.WindowManager.instance.setPosition(
+            Offset(clampedX, clampedY),
+          );
+        }
       } catch (e) {
         debugPrint('Desktop settings error: $e');
       }
     }
   }
 
-  // Modified: Timer now starts and continues until back is pressed
   void _startTimer() {
-    // Only start if not already running (first entry into screen or after reset cycle)
-    if (!isRunning) {
-      setState(() {
-        isRunning = true;
-      });
-      // Play initial transition effect if starting fresh
-      if (currentSection == 0 && timeLeftInSeconds == widget.settings.sectionMinutes.reduce((a, b) => a + b) * 60) {
+    if (isRunning) return;
+    setState(() {
+      isRunning = true;
+    });
+    // Play initial transition effect if starting fresh
+    if (currentSection == 0 && timeLeftInSeconds == widget.settings.sectionMinutes.reduce((a, b) => a + b) * 60) {
          _playTransitionEffects(currentSection % 2 == 0);
-      }
-      if (Platform.isAndroid || Platform.isIOS) {
-        WakelockPlus.enable();
-      }
-      _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
     }
+    if (Platform.isAndroid || Platform.isIOS) {
+      WakelockPlus.enable();
+    }
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
   }
 
   void _tick() {
-    if (!isRunning) return; // This check makes sure the timer pauses if isRunning becomes false (e.g., from _resetAndGoBack)
+    if (!isRunning) return;
     setState(() {
       timeLeftInSeconds--;
       _checkSectionTransition();
@@ -466,10 +583,7 @@ class _PomodoroScreenState extends State<PomodoroScreen>
         timeLeftInSeconds =
             widget.settings.sectionMinutes.reduce((a, b) => a + b) * 60;
         currentSection = 0;
-        // isRunning remains true to keep the cycle going
       });
-      // The timer itself does not cancel and restart, it just continues to tick
-      // The logic above ensures timeLeftInSeconds resets and the cycle repeats.
     }
   }
 
@@ -493,48 +607,59 @@ class _PomodoroScreenState extends State<PomodoroScreen>
       setState(() {
         currentSection = newSection;
       });
+      // Play transition effects for new sections
       if (currentSection != 0 || elapsedTime > 0) {
         _playTransitionEffects(currentSection % 2 == 0);
       }
     }
   }
 
-  void _playTransitionEffects(bool isWork) {
+  // Modified: Make _playTransitionEffects async and re-set source/clip
+  void _playTransitionEffects(bool isWork) async {
     if (widget.settings.isSoundEnabled) {
-      _player.seek(Duration.zero);
-      _player.play().catchError((e) {
+      try {
+        // Stop any currently playing audio from this player first
+        await _player.stop(); // Ensures the player is reset
+        // Re-set the asset source and clip before playing to ensure it's fresh for each playback
+        await _player.setAsset('assets/sounds/tick.wav');
+        await _player.setClip(
+          end: Duration(
+            milliseconds: (widget.settings.audioDuration * 1000).toInt(),
+          ),
+        );
+        // Explicitly load the source after setting the clip to ensure preparation
+        await _player.load(); // CRUCIAL for reliable clipping on desktop
+        // Then play
+        await _player.play();
+      } catch (e) {
         debugPrint('Audio play error: $e');
-      });
+      }
     }
     if (widget.settings.isVibrationEnabled) {
       _flashController.forward().then((_) => _flashController.reverse());
     }
   }
 
-  // Removed _showSettingsDialog functionality tied to main clock tap.
-  // The functionality of _showSettingsDialog is for the settings page.
-
-  // NEW: Method to show the central back button and start its hide timer
   void _showCentralBackButton() {
-    _centralButtonVisibilityTimer?.cancel(); // Cancel any existing timer
+    _centralButtonVisibilityTimer?.cancel();
     if (!_isCentralButtonVisible) {
       setState(() {
-        _isCentralButtonVisible = true; // Show the button
+        _isCentralButtonVisible = true;
       });
     }
-    _centralButtonVisibilityTimer = Timer(const Duration(seconds: 3), () { // Hide after 3 seconds
+    _centralButtonVisibilityTimer = Timer(const Duration(seconds: 3), () {
       if (mounted) {
         setState(() {
-          _isCentralButtonVisible = false; // Hide the button
+          _isCentralButtonVisible = false;
         });
       }
     });
   }
 
-  void _resetAndGoBack() {
-    _timer?.cancel(); // Stop the timer when going back
+  void _resetAndGoBack() async {
+    _timer?.cancel();
     setState(() {
-      isRunning = false; // Set isRunning to false to stop the timer.
+      isRunning = false;
       timeLeftInSeconds =
           widget.settings.sectionMinutes.reduce((a, b) => a + b) * 60;
       currentSection = 0;
@@ -545,15 +670,17 @@ class _PomodoroScreenState extends State<PomodoroScreen>
     if (!kIsWeb &&
         (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
       try {
-        window_manager.WindowManager.instance.setIgnoreMouseEvents(false);
-        window_manager.WindowManager.instance.setMovable(true);
-        window_manager.WindowManager.instance.setOpacity(1.0);
-        window_manager.WindowManager.instance.setSize(const Size(400, 400));
+        // Reset desktop window properties to defaults for settings page context
+        await window_manager.WindowManager.instance.setIgnoreMouseEvents(false); // Make window clickable again
+        await window_manager.WindowManager.instance.setMovable(true); // Make window movable again (temp for settings screen)
+        await window_manager.WindowManager.instance.setOpacity(1.0); // Full opacity
+        await window_manager.WindowManager.instance.setSize(const Size(400, 400)); // Default size
+        await window_manager.WindowManager.instance.center(); // Center the window
       } catch (e) {
         debugPrint('Reset desktop settings error: $e');
       }
     }
-    Navigator.pop(context); // Go back to the previous screen (settings)
+    Navigator.pop(context);
   }
 
   @override
@@ -561,7 +688,7 @@ class _PomodoroScreenState extends State<PomodoroScreen>
     _timer?.cancel();
     _player.dispose();
     _flashController.dispose();
-    _centralButtonVisibilityTimer?.cancel(); // Dispose visibility timer
+    _centralButtonVisibilityTimer?.cancel();
     if (Platform.isAndroid || Platform.isIOS) {
       WakelockPlus.disable();
     }
@@ -572,18 +699,15 @@ class _PomodoroScreenState extends State<PomodoroScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: LayoutBuilder( // Use LayoutBuilder to get the size for central tap detection
+      body: LayoutBuilder(
         builder: (context, constraints) {
           final centerX = constraints.maxWidth / 2;
           final centerY = constraints.maxHeight / 2;
-          final clockRadius = math.min(constraints.maxWidth, constraints.maxHeight) / 2 - 12; // Re-use clock radius calc
+          final clockRadius = (math.min(constraints.maxWidth, constraints.maxHeight) / 2) - 12;
           final centralTapRadius = clockRadius * 0.10; // 10% of clock radius
 
           return GestureDetector(
-            // Tap anywhere to show the new central back button on desktop (via MouseRegion onHover)
-            // On mobile, tapping anywhere will also trigger _showCentralBackButton
-            // The main tap area is now for showing the central button, not for settings dialog.
-            onTapDown: (details) { // Use onTapDown to get precise tap position
+            onTapDown: (details) {
               final tapPosition = details.localPosition;
               final distance = math.sqrt(
                 math.pow(tapPosition.dx - centerX, 2) +
@@ -593,22 +717,27 @@ class _PomodoroScreenState extends State<PomodoroScreen>
               if (distance <= centralTapRadius) {
                 _showCentralBackButton();
               }
-              // If outside the central region, nothing happens on tap
             },
-            behavior: HitTestBehavior.translucent, // Ensures taps are detected across the whole screen
-            child: MouseRegion( // For desktop mouse movement
+            behavior: HitTestBehavior.translucent,
+            child: MouseRegion(
               onHover: (event) {
-                // Not using onHover to show the central button anymore,
-                // only onTapDown in the central region will show it.
-                // This MouseRegion is now primarily for the old back button opacity behavior
-                // (which is being removed). Will simplify this later.
+                final distance = math.sqrt(
+                  math.pow(event.localPosition.dx - centerX, 2) +
+                  math.pow(event.localPosition.dy - centerY, 2),
+                );
+                if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS) && distance <= centralTapRadius) {
+                  _showCentralBackButton();
+                } else if (_isCentralButtonVisible && distance > centralTapRadius && _centralButtonVisibilityTimer != null && !_centralButtonVisibilityTimer!.isActive) {
+                    setState(() {
+                      _isCentralButtonVisible = false;
+                    });
+                }
               },
               child: Stack(
                 children: [
-                  // Original CustomPaint for the clock
                   Center(
                     child: CustomPaint(
-                      size: Size(constraints.maxWidth, constraints.maxHeight), // Make clock fill available space
+                      size: Size(constraints.maxWidth, constraints.maxHeight),
                       painter: CircleTimerPainter(
                         timeLeftInSeconds: timeLeftInSeconds,
                         totalTimeInSeconds:
@@ -622,17 +751,16 @@ class _PomodoroScreenState extends State<PomodoroScreen>
                     ),
                   ),
 
-                  // NEW: Central Back Button
                   Center(
                     child: AnimatedOpacity(
                       opacity: _isCentralButtonVisible ? 1.0 : 0.0,
                       duration: const Duration(milliseconds: 300),
-                      child: IgnorePointer( // Always ignore when not visible, always active when visible
+                      child: IgnorePointer(
                         ignoring: !_isCentralButtonVisible,
                         child: FloatingActionButton(
-                          onPressed: _resetAndGoBack, // Go back to settings page
-                          backgroundColor: Colors.blueGrey, // A distinct color for this button
-                          heroTag: 'centralBackButton', // Required if you have multiple FABs
+                          onPressed: _resetAndGoBack,
+                          backgroundColor: Colors.blueGrey,
+                          heroTag: 'centralBackButton',
                           child: const Icon(Icons.settings_backup_restore, color: Colors.white, size: 30),
                         ),
                       ),
