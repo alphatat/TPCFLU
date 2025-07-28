@@ -13,7 +13,7 @@ dependencies:
   media_kit_libs_linux: ^1.2.1
   shared_preferences: ^2.3.0
   flutter_colorpicker: ^1.1.0
-  window_manager: ^0.5.2 # Upgraded for desktop stability
+  window_manager: ^0.5.1 # Upgraded for desktop stability
   wakelock_plus: ^1.3.2
   provider: ^6.1.5
 
