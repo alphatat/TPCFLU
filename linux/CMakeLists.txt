@@ -2,6 +2,8 @@
 cmake_minimum_required(VERSION 3.13)
 project(runner LANGUAGES CXX)
 
+# Find mimalloc
+find_library(MIMALLOC_LIB NAMES mimalloc libmimalloc)
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
 set(BINARY_NAME "tpcflu")
@@ -125,4 +127,9 @@ install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
 if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
   install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
     COMPONENT Runtime)
+endif()
+
+# Link mimalloc for just_audio_media_kit
+if(MIMALLOC_LIB)
+  target_link_libraries(${BINARY_NAME} PRIVATE ${MIMALLOC_LIB})
 endif()
