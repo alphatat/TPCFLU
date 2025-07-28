@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_media_kit/just_audio_media_kit.dart'; // Keep this for desktop audio backend
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart' as window_manager;
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -109,7 +110,13 @@ class PomodoroSettings with ChangeNotifier {
 }
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  WidgetsFlutterBinding.ensureInitialized(); // Always ensure initialized first
+
+  // Initialize JustAudioMediaKit backend for desktop platforms
+  if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
+    JustAudioMediaKit.ensureInitialized(); // No need for windows: true or linux: true, it handles it
+  }
+
   if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
     try {
       await window_manager.WindowManager.instance.ensureInitialized();
@@ -369,10 +376,13 @@ class _PomodoroScreenState extends State<PomodoroScreen>
   final AudioPlayer _player = AudioPlayer();
   int currentSection = 0;
   late int timeLeftInSeconds;
-  bool isRunning = false;
-  bool _isBackButtonHovered = false;
+  bool isRunning = false; // This now just indicates if the timer is *active* after initial start
   late AnimationController _flashController;
   Timer? _timer;
+
+  // NEW: Variables for central back button visibility
+  Timer? _centralButtonVisibilityTimer;
+  bool _isCentralButtonVisible = false;
 
   @override
   void initState() {
@@ -385,6 +395,9 @@ class _PomodoroScreenState extends State<PomodoroScreen>
     );
     _loadAudio();
     _applyDesktopSettings();
+
+    // Start the timer automatically when entering the screen
+    _startTimer();
   }
 
   Future<void> _loadAudio() async {
@@ -423,20 +436,26 @@ class _PomodoroScreenState extends State<PomodoroScreen>
     }
   }
 
+  // Modified: Timer now starts and continues until back is pressed
   void _startTimer() {
-    if (isRunning) return;
-    setState(() {
-      isRunning = true;
-    });
-    _playTransitionEffects(currentSection % 2 == 0);
-    if (Platform.isAndroid || Platform.isIOS) {
-      WakelockPlus.enable();
+    // Only start if not already running (first entry into screen or after reset cycle)
+    if (!isRunning) {
+      setState(() {
+        isRunning = true;
+      });
+      // Play initial transition effect if starting fresh
+      if (currentSection == 0 && timeLeftInSeconds == widget.settings.sectionMinutes.reduce((a, b) => a + b) * 60) {
+         _playTransitionEffects(currentSection % 2 == 0);
+      }
+      if (Platform.isAndroid || Platform.isIOS) {
+        WakelockPlus.enable();
+      }
+      _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
     }
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
   }
 
   void _tick() {
-    if (!isRunning) return;
+    if (!isRunning) return; // This check makes sure the timer pauses if isRunning becomes false (e.g., from _resetAndGoBack)
     setState(() {
       timeLeftInSeconds--;
       _checkSectionTransition();
@@ -447,10 +466,10 @@ class _PomodoroScreenState extends State<PomodoroScreen>
         timeLeftInSeconds =
             widget.settings.sectionMinutes.reduce((a, b) => a + b) * 60;
         currentSection = 0;
-        isRunning = false;
+        // isRunning remains true to keep the cycle going
       });
-      _timer?.cancel();
-      Future.delayed(const Duration(milliseconds: 100), _startTimer);
+      // The timer itself does not cancel and restart, it just continues to tick
+      // The logic above ensures timeLeftInSeconds resets and the cycle repeats.
     }
   }
 
@@ -492,130 +511,30 @@ class _PomodoroScreenState extends State<PomodoroScreen>
     }
   }
 
-  void _showSettingsDialog() {
-    final localSettings = PomodoroSettings();
-    localSettings.sectionMinutes = widget.settings.sectionMinutes.toList();
-    localSettings.isClickThroughEnabled = widget.settings.isClickThroughEnabled;
-    localSettings.isDraggable = widget.settings.isDraggable;
-    localSettings.opacity = widget.settings.opacity;
-    localSettings.windowSize = widget.settings.windowSize;
+  // Removed _showSettingsDialog functionality tied to main clock tap.
+  // The functionality of _showSettingsDialog is for the settings page.
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Timer Settings'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ...List.generate(
-                4,
-                (index) => TextField(
-                  decoration: InputDecoration(
-                    labelText: 'Section ${index + 1} (minutes)',
-                  ),
-                  keyboardType: TextInputType.number,
-                  controller: TextEditingController(
-                    text: localSettings.sectionMinutes[index].toString(),
-                  ),
-                  onChanged: (value) {
-                    localSettings.updateSectionMinutes(
-                      index,
-                      int.tryParse(value) ??
-                          localSettings.sectionMinutes[index],
-                    );
-                  },
-                ),
-              ),
-              if (!kIsWeb &&
-                  (Platform.isWindows ||
-                      Platform.isLinux ||
-                      Platform.isMacOS)) ...[
-                CheckboxListTile(
-                  title: const Text('Click-Through'),
-                  value: localSettings.isClickThroughEnabled,
-                  onChanged: (value) {
-                    localSettings.updateClickThrough(value ?? false);
-                    window_manager.WindowManager.instance.setIgnoreMouseEvents(
-                      value ?? false,
-                    );
-                  },
-                ),
-                CheckboxListTile(
-                  title: const Text('Draggable'),
-                  value: localSettings.isDraggable,
-                  onChanged: (value) {
-                    localSettings.updateDraggable(value ?? false);
-                    window_manager.WindowManager.instance.setMovable(
-                      value ?? false,
-                    );
-                  },
-                ),
-                const Text('Window Opacity'),
-                Slider(
-                  value: localSettings.opacity,
-                  min: 0.1,
-                  max: 1.0,
-                  divisions: 9,
-                  label: localSettings.opacity.toStringAsFixed(1),
-                  onChanged: (value) {
-                    localSettings.updateOpacity(value);
-                    window_manager.WindowManager.instance.setOpacity(value);
-                  },
-                ),
-                const Text('Window Size'),
-                Slider(
-                  value: localSettings.windowSize,
-                  min: 200.0,
-                  max: 800.0,
-                  divisions: 12,
-                  label: localSettings.windowSize.toStringAsFixed(0),
-                  onChanged: (value) {
-                    localSettings.updateWindowSize(value);
-                    window_manager.WindowManager.instance.setSize(
-                      Size(value, value),
-                    );
-                  },
-                ),
-              ],
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              widget.settings.sectionMinutes = localSettings.sectionMinutes
-                  .toList();
-              widget.settings.updateClickThrough(
-                localSettings.isClickThroughEnabled,
-              );
-              widget.settings.updateDraggable(localSettings.isDraggable);
-              widget.settings.updateOpacity(localSettings.opacity);
-              widget.settings.updateWindowSize(localSettings.windowSize);
-              widget.settings.savePreferences();
-              setState(() {
-                timeLeftInSeconds =
-                    widget.settings.sectionMinutes.reduce((a, b) => a + b) * 60;
-                currentSection = 0;
-              });
-              _applyDesktopSettings();
-              Navigator.pop(context);
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
+  // NEW: Method to show the central back button and start its hide timer
+  void _showCentralBackButton() {
+    _centralButtonVisibilityTimer?.cancel(); // Cancel any existing timer
+    if (!_isCentralButtonVisible) {
+      setState(() {
+        _isCentralButtonVisible = true; // Show the button
+      });
+    }
+    _centralButtonVisibilityTimer = Timer(const Duration(seconds: 3), () { // Hide after 3 seconds
+      if (mounted) {
+        setState(() {
+          _isCentralButtonVisible = false; // Hide the button
+        });
+      }
+    });
   }
 
   void _resetAndGoBack() {
-    _timer?.cancel();
+    _timer?.cancel(); // Stop the timer when going back
     setState(() {
-      isRunning = false;
+      isRunning = false; // Set isRunning to false to stop the timer.
       timeLeftInSeconds =
           widget.settings.sectionMinutes.reduce((a, b) => a + b) * 60;
       currentSection = 0;
@@ -634,7 +553,7 @@ class _PomodoroScreenState extends State<PomodoroScreen>
         debugPrint('Reset desktop settings error: $e');
       }
     }
-    Navigator.pop(context);
+    Navigator.pop(context); // Go back to the previous screen (settings)
   }
 
   @override
@@ -642,6 +561,7 @@ class _PomodoroScreenState extends State<PomodoroScreen>
     _timer?.cancel();
     _player.dispose();
     _flashController.dispose();
+    _centralButtonVisibilityTimer?.cancel(); // Dispose visibility timer
     if (Platform.isAndroid || Platform.isIOS) {
       WakelockPlus.disable();
     }
@@ -651,92 +571,78 @@ class _PomodoroScreenState extends State<PomodoroScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          MouseRegion(
-            onEnter: (_) {
-              if (!widget.settings.isClickThroughEnabled) {
-                setState(() => _isBackButtonHovered = true);
+      backgroundColor: Colors.transparent,
+      body: LayoutBuilder( // Use LayoutBuilder to get the size for central tap detection
+        builder: (context, constraints) {
+          final centerX = constraints.maxWidth / 2;
+          final centerY = constraints.maxHeight / 2;
+          final clockRadius = math.min(constraints.maxWidth, constraints.maxHeight) / 2 - 12; // Re-use clock radius calc
+          final centralTapRadius = clockRadius * 0.10; // 10% of clock radius
+
+          return GestureDetector(
+            // Tap anywhere to show the new central back button on desktop (via MouseRegion onHover)
+            // On mobile, tapping anywhere will also trigger _showCentralBackButton
+            // The main tap area is now for showing the central button, not for settings dialog.
+            onTapDown: (details) { // Use onTapDown to get precise tap position
+              final tapPosition = details.localPosition;
+              final distance = math.sqrt(
+                math.pow(tapPosition.dx - centerX, 2) +
+                math.pow(tapPosition.dy - centerY, 2),
+              );
+
+              if (distance <= centralTapRadius) {
+                _showCentralBackButton();
               }
+              // If outside the central region, nothing happens on tap
             },
-            onExit: (_) => setState(() => _isBackButtonHovered = false),
-            child: GestureDetector(
-              onTap: widget.settings.isClickThroughEnabled
-                  ? null
-                  : _showSettingsDialog,
-              child: Center(
-                child: CustomPaint(
-                  size: const Size(300, 300),
-                  painter: CircleTimerPainter(
-                    timeLeftInSeconds: timeLeftInSeconds,
-                    totalTimeInSeconds:
-                        widget.settings.sectionMinutes.reduce((a, b) => a + b) *
-                        60,
-                    sections: widget.settings.sectionMinutes,
-                    currentSection: currentSection,
-                    flashOpacity: _flashController.value,
-                    workColor: widget.settings.workColor,
-                    restColor: widget.settings.restColor,
+            behavior: HitTestBehavior.translucent, // Ensures taps are detected across the whole screen
+            child: MouseRegion( // For desktop mouse movement
+              onHover: (event) {
+                // Not using onHover to show the central button anymore,
+                // only onTapDown in the central region will show it.
+                // This MouseRegion is now primarily for the old back button opacity behavior
+                // (which is being removed). Will simplify this later.
+              },
+              child: Stack(
+                children: [
+                  // Original CustomPaint for the clock
+                  Center(
+                    child: CustomPaint(
+                      size: Size(constraints.maxWidth, constraints.maxHeight), // Make clock fill available space
+                      painter: CircleTimerPainter(
+                        timeLeftInSeconds: timeLeftInSeconds,
+                        totalTimeInSeconds:
+                            widget.settings.sectionMinutes.reduce((a, b) => a + b) * 60,
+                        sections: widget.settings.sectionMinutes,
+                        currentSection: currentSection,
+                        flashOpacity: _flashController.value,
+                        workColor: widget.settings.workColor,
+                        restColor: widget.settings.restColor,
+                      ),
+                    ),
                   ),
-                ),
+
+                  // NEW: Central Back Button
+                  Center(
+                    child: AnimatedOpacity(
+                      opacity: _isCentralButtonVisible ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 300),
+                      child: IgnorePointer( // Always ignore when not visible, always active when visible
+                        ignoring: !_isCentralButtonVisible,
+                        child: FloatingActionButton(
+                          onPressed: _resetAndGoBack, // Go back to settings page
+                          backgroundColor: Colors.blueGrey, // A distinct color for this button
+                          heroTag: 'centralBackButton', // Required if you have multiple FABs
+                          child: const Icon(Icons.settings_backup_restore, color: Colors.white, size: 30),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-          Positioned(
-            top: 20,
-            left: 20,
-            child: IgnorePointer(
-              ignoring:
-                  widget.settings.isClickThroughEnabled &&
-                  !_isBackButtonHovered,
-              child: AnimatedOpacity(
-                opacity: _isBackButtonHovered ? 1.0 : 0.3,
-                duration: const Duration(milliseconds: 200),
-                child: MouseRegion(
-                  onEnter: (_) {
-                    if (!widget.settings.isClickThroughEnabled) {
-                      setState(() => _isBackButtonHovered = true);
-                      if (!kIsWeb &&
-                          (Platform.isWindows ||
-                              Platform.isLinux ||
-                              Platform.isMacOS)) {
-                        window_manager.WindowManager.instance.setOpacity(
-                          widget.settings.opacity + 0.2 > 1.0
-                              ? 1.0
-                              : widget.settings.opacity + 0.2,
-                        );
-                      }
-                    }
-                  },
-                  onExit: (_) {
-                    setState(() => _isBackButtonHovered = false);
-                    if (!kIsWeb &&
-                        (Platform.isWindows ||
-                            Platform.isLinux ||
-                            Platform.isMacOS)) {
-                      window_manager.WindowManager.instance.setOpacity(
-                        widget.settings.opacity,
-                      );
-                    }
-                  },
-                  child: IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    onPressed: _resetAndGoBack,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 20,
-            right: 20,
-            child: FloatingActionButton(
-              onPressed: _startTimer,
-              backgroundColor: Colors.red,
-              child: const Icon(Icons.play_arrow, color: Colors.white),
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
