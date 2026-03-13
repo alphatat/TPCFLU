@@ -80,27 +80,6 @@ jobs:
           path: build/ios/iphoneos/tpcflu-ios.zip
           retention-days: 7
 
-  build-macos:
-    name: Build macOS
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.32.8'
-          channel: 'stable'
-      - run: flutter pub get
-      - run: flutter build macos --release
-      - run: |
-          cd build/macos/Build/Products/Release
-          zip -r tpcflu-macos.zip tpcflu.app
-      - uses: actions/upload-artifact@v4
-        with:
-          name: tpcflu-macos
-          path: build/macos/Build/Products/Release/tpcflu-macos.zip
-          retention-days: 7
 
   build-linux:
     name: Build Linux
@@ -129,7 +108,7 @@ jobs:
 
   release:
     name: Create Release
-    needs: [build-windows, build-android, build-ios, build-macos, build-linux]
+    needs: [build-windows, build-android, build-ios, build-linux]
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
     permissions:
@@ -151,7 +130,6 @@ jobs:
             artifacts/tpcflu-android/*.apk
             artifacts/tpcflu-android/*.aab
             artifacts/tpcflu-ios/tpcflu-ios.zip
-            artifacts/tpcflu-macos/tpcflu-macos.zip
             artifacts/tpcflu-linux/tpcflu-linux.tar.gz
           draft: false
           prerelease: false
